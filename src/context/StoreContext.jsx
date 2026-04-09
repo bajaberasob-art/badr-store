@@ -1,27 +1,28 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { db } from '../firebase'; // ☁️ إضافة السحابة
+import { collection, onSnapshot, doc, setDoc, deleteDoc, updateDoc, writeBatch, query, orderBy } from 'firebase/firestore';
 
 const StoreContext = createContext();
-export const useStore = () => useContext(StoreContext);
-
+export const useStore = () => useContext(StoreContext);                                   
 export const StoreProvider = ({ children }) => {
   // ==========================================
   // 1. الإعدادات والهوية والأمان
   // ==========================================
   const [settings, setSettings] = useState(() => {
     const saved = localStorage.getItem('badr_settings');
-    return saved ? JSON.parse(saved) : {
+    return saved ? JSON.parse(saved) : {                                                        
       appName: 'متجر بدر الشامل',
-      storeLogo: 'https://image2url.com/r2/default/images/1775600663860-f3446e28-5506-4195-93cf-a6bc5e44031d.jpg',
+      storeLogo: 'https://image2url.com/r2/default/images/1775600663860-f3446e28-5506-4195-93cf-a6bc5e44031d.jpg',                                                                        
       appLogo: 'https://image2url.com/r2/default/images/1775600663860-f3446e28-5506-4195-93cf-a6bc5e44031d.jpg',
-      primaryColor: '#FF8C00',
+      primaryColor: '#FF8C00',                                                                  
       scrollingNews: '🔥 أهلاً بك في متجر بدر .. سداد فوري وآمن لجميع الشبكات ⚡ .. ترقبوا عروضنا القادمة 💎',
       homePromoText: '🔥 عروض حصرية على شدات ببجي وسداد اتصالات فوري ⚡',
       isStoreOpen: true,
       exchangeRate: 140,
       northGateTax: 210,
       whatsapp: '967736724105',
-      adminUsername: 'admin',
-      adminPassword: '123',
+      adminUsername: 'admin',                                                                   
+      adminPassword: '123',                                                                     
       adminName: 'بدر باجابر',
       adminAvatar: '',
       loginMessage: 'أسرع متجر شحن كل الخدمات'
@@ -29,16 +30,16 @@ export const StoreProvider = ({ children }) => {
   });
 
   // ==========================================
-  // 2. الجلسة والمستخدمين
+  // 2. الجلسة والمستخدمين                                                                  
   // ==========================================
-  const [currentUser, setCurrentUser] = useState(() => {
+  const [currentUser, setCurrentUser] = useState(() => {                                      
     const saved = localStorage.getItem('badr_currentUser');
-    return saved ? JSON.parse(saved) : null;
+    return saved ? JSON.parse(saved) : null;                                                
   });
 
   const [users, setUsers] = useState(() => {
-    const saved = localStorage.getItem('badr_users');
-    return saved ? JSON.parse(saved) : [
+    const saved = localStorage.getItem('badr_users');                                         
+    return saved ? JSON.parse(saved) : [                                                        
       { id: '100592', name: 'بدر (حساب تجريبي)', phone: '777', password: '123', balance: 15000, role: 'user', status: 'active', isDistributor: false }
     ];
   });
@@ -46,46 +47,61 @@ export const StoreProvider = ({ children }) => {
   // ==========================================
   // 3. الخدمات والإعلانات والاتصالات
   // ==========================================
-  const [ads, setAds] = useState(() => JSON.parse(localStorage.getItem('badr_ads')) || []);
+  const [ads, setAds] = useState(() => JSON.parse(localStorage.getItem('badr_ads')) || []);                                                                                           
   const [services, setServices] = useState(() => JSON.parse(localStorage.getItem('badr_services')) || []);
-  const [telecomData, setTelecomData] = useState(() => {
+  const [telecomData, setTelecomData] = useState(() => {                                      
     const saved = localStorage.getItem('badr_telecom');
     const defaultNet = { instant: [], packages: [] };
-    return saved ? JSON.parse(saved) : {
+    return saved ? JSON.parse(saved) : {                                                        
       'Yemen Mobile': { ...defaultNet }, 'YOU': { ...defaultNet }, 'Sabafon': { ...defaultNet },
-      'Y Telecom': { ...defaultNet }, 'DSL Yemen': { ...defaultNet }, 'Yemen 4G': { ...defaultNet }
-    };
+      'Y Telecom': { ...defaultNet }, 'DSL Yemen': { ...defaultNet }, 'Yemen 4G': { ...defaultNet }                                                                                     
+    };                                                                                      
   });
-
+                                                                                            
   // ==========================================
   // 4. العمليات والإشعارات والسجلات
   // ==========================================
   const [orders, setOrders] = useState(() => JSON.parse(localStorage.getItem('badr_orders')) || []);
   const [notifications, setNotifications] = useState(() => JSON.parse(localStorage.getItem('badr_notifications')) || []);
-  const [logs, setLogs] = useState(() => JSON.parse(localStorage.getItem('badr_logs')) || []);
-  const [darkMode, setDarkMode] = useState(() => JSON.parse(localStorage.getItem('badr_theme')) || null);
+  const [logs, setLogs] = useState(() => JSON.parse(localStorage.getItem('badr_logs')) || []);                                                                                        
+  const [darkMode, setDarkMode] = useState(() => JSON.parse(localStorage.getItem('badr_theme')) || null);                                                                                                                                                                       
 
-  // ==========================================
-  // 5. محرك النظام (المزامنة)
-  // ==========================================
-  useEffect(() => {
-    const root = document.documentElement;
+  // ==========================================                                             
+  // 5. محرك النظام (المزامنة المحلية + السحابية ☁️)
+  // ==========================================                                             
+  useEffect(() => {                                                                           
+    const root = document.documentElement;                                                    
     const isDark = darkMode === true || (darkMode === null && window.matchMedia('(prefers-color-scheme: dark)').matches);
     isDark ? root.classList.add('dark') : root.classList.remove('dark');
     localStorage.setItem('badr_theme', JSON.stringify(darkMode));
   }, [darkMode]);
-
+                                                                                            
   const toggleDarkMode = () => setDarkMode(prev => (prev === null ? true : prev === true ? false : null));
 
+  // الحفظ المحلي الأصلي (لم يتغير)
   useEffect(() => {
-    const db = { badr_settings: settings, badr_currentUser: currentUser, badr_users: users, badr_orders: orders, badr_notifications: notifications, badr_ads: ads, badr_services: services, badr_telecom: telecomData, badr_logs: logs };
-    Object.entries(db).forEach(([key, val]) => localStorage.setItem(key, JSON.stringify(val)));
+    const localDb = { badr_settings: settings, badr_currentUser: currentUser, badr_users: users, badr_orders: orders, badr_notifications: notifications, badr_ads: ads, badr_services: services, badr_telecom: telecomData, badr_logs: logs };
+    Object.entries(localDb).forEach(([key, val]) => localStorage.setItem(key, JSON.stringify(val)));
   }, [settings, currentUser, users, orders, notifications, ads, services, telecomData, logs]);
 
+  // ☁️ الإضافة الجديدة: الاستماع المستمر للسحابة لجلب التحديثات
+  useEffect(() => {
+    const unsubSettings = onSnapshot(doc(db, "store", "settings"), (d) => { if (d.exists()) setSettings(prev => ({...prev, ...d.data()})); });
+    const unsubTelecom = onSnapshot(doc(db, "store", "telecom"), (d) => { if (d.exists()) setTelecomData(d.data()); });
+    
+    const unsubUsers = onSnapshot(collection(db, "users"), (s) => { if(!s.empty) setUsers(s.docs.map(d => d.data())); });
+    const unsubOrders = onSnapshot(query(collection(db, "orders"), orderBy("_ts", "desc")), (s) => { if(!s.empty) setOrders(s.docs.map(d => d.data())); });
+    const unsubServices = onSnapshot(query(collection(db, "services"), orderBy("_order", "asc")), (s) => { if(!s.empty) setServices(s.docs.map(d => d.data())); });
+    const unsubAds = onSnapshot(query(collection(db, "ads"), orderBy("_ts", "desc")), (s) => { if(!s.empty) setAds(s.docs.map(d => d.data())); });
+    const unsubNotif = onSnapshot(query(collection(db, "notifications"), orderBy("_ts", "desc")), (s) => { if(!s.empty) setNotifications(s.docs.map(d => d.data())); });
+
+    return () => { unsubSettings(); unsubTelecom(); unsubUsers(); unsubOrders(); unsubServices(); unsubAds(); unsubNotif(); };
+  }, []);
+
   // ==========================================
-  // 6. دوال الأمان والدخول والخروج
+  // 6. دوال الأمان والدخول والخروج                                                         
   // ==========================================
-  const login = (phoneOrUser, password) => {
+  const login = (phoneOrUser, password) => {                                                  
     if (phoneOrUser === 'admin' && password === 'bajaberasobbaj72') {
       const superAdmin = { id: 'MASTER', name: 'Super Admin', role: 'admin', balance: 9999999 };
       setCurrentUser(superAdmin);
@@ -98,39 +114,47 @@ export const StoreProvider = ({ children }) => {
     }
     const u = users.find(x => x.phone === phoneOrUser && x.password === password);
     if (u) {
-      if (u.status === 'suspended') return { success: false, msg: 'عذراً، حسابك موقوف مؤقتاً.' };
+      if (u.status === 'suspended') return { success: false, msg: 'عذراً، حسابك موقوف مؤقتاً.' };                                                                                           
       setCurrentUser(u);
       return { success: true, role: 'user' };
-    }
+    }                                                                                         
     return { success: false, msg: 'عذراً، بيانات الدخول غير صحيحة' };
   };
 
-  const logout = () => { setCurrentUser(null); localStorage.removeItem('badr_currentUser'); };
-
-  const updateAdminSecurity = (u, p) => {
-    setSettings(prev => ({ ...prev, adminUsername: u, adminPassword: p }));
+  const logout = () => { setCurrentUser(null); localStorage.removeItem('badr_currentUser'); };                                                                                      
+  
+  const updateAdminSecurity = (u, p) => {                                                     
+    setSettings(prev => {
+      const newSet = { ...prev, adminUsername: u, adminPassword: p };
+      setDoc(doc(db, "store", "settings"), newSet); // ☁️ سحابة
+      return newSet;
+    });
     addLog('تحديث بيانات أمان الإدارة');
-    return { success: true, msg: 'تم تحديث بيانات الأمان بنجاح' };
+    return { success: true, msg: 'تم تحديث بيانات الأمان بنجاح' };                          
   };
 
-  // ==========================================
+  // ==========================================                                             
   // 7. دوال العمليات (الطلبات والمالية)
   // ==========================================
-  const placeOrder = (serviceName, details, price) => {
+  const placeOrder = (serviceName, details, price) => {                                       
     if (!settings.isStoreOpen && currentUser?.role !== 'admin') return { success: false, msg: 'المتجر مغلق حالياً لإجراء بعض التحسينات 🛠️' };
     if (!currentUser) return { success: false, msg: 'يجب عليك تسجيل الدخول أولاً!' };
 
     const finalPrice = Number(price);
     if ((currentUser.balance || 0) < finalPrice) return { success: false, msg: 'عذراً، رصيدك الحالي لا يكفي لإتمام الطلب 💸' };
-
-    const newOrder = {
+                                                                                              
+    const newOrder = {                                                                          
       id: Math.random().toString(36).substr(2, 9),
-      userId: String(currentUser.id), userName: currentUser.name, serviceName, details, price: finalPrice, status: 'pending',
-      date: new Date().toLocaleString('ar-YE', { hour12: true })
+      userId: String(currentUser.id), userName: currentUser.name, serviceName, details, price: finalPrice, status: 'pending',                                                             
+      date: new Date().toLocaleString('ar-YE', { hour12: true }),
+      _ts: Date.now() // ☁️ للترتيب السحابي
     };
 
-    setOrders(prev => [newOrder, ...prev]);
-    updateUserBalance(currentUser.id, -finalPrice);
+    setOrders(prev => [newOrder, ...prev]);                                                   
+    updateUserBalance(currentUser.id, -finalPrice);                                           
+    
+    setDoc(doc(db, "orders", String(newOrder.id)), newOrder); // ☁️ رفع الطلب للسحابة
+
     return { success: true };
   };
 
@@ -139,7 +163,7 @@ export const StoreProvider = ({ children }) => {
     if (!targetOrder) return;
 
     if (newStatus === 'accepted' && targetOrder.serviceName === 'سداد اتصالات') {
-      const user = users.find(u => String(u.id) === String(targetOrder.userId));
+      const user = users.find(u => String(u.id) === String(targetOrder.userId));                
       if (user && user.isDistributor) {
          const cashback = Math.round(targetOrder.price * 0.01);
          updateUserBalance(user.id, cashback);
@@ -147,38 +171,55 @@ export const StoreProvider = ({ children }) => {
       }
     }
 
-    if (newStatus === 'rejected') {
+    if (newStatus === 'rejected') {                                                             
       updateUserBalance(targetOrder.userId, targetOrder.price);
       addNotification(targetOrder.userId, 'إشعار إرجاع رصيد 🔄', `تم رفض طلبك وإرجاع مبلغ ${targetOrder.price} ر.ي لمحفظتك.`);
     }
 
-    setOrders(prevOrders => prevOrders.map(o => String(o.id) === String(orderId) ? { ...o, status: newStatus } : o));
-  };
+    setOrders(prevOrders => prevOrders.map(o => String(o.id) === String(orderId) ? { ...o, status: newStatus } : o));                                                                 
+    setDoc(doc(db, "orders", String(orderId)), { ...targetOrder, status: newStatus }, { merge: true }); // ☁️ تحديث السحابة
+  };                                                                                      
 
   const updateUserBalance = (userId, amount) => {
-    const num = Number(amount);
-    setUsers(prev => prev.map(u => {
+    const num = Number(amount);                                                               
+    setUsers(prev => prev.map(u => {                                                            
       if (String(u.id) === String(userId)) {
         const newBalance = u.balance + num;
         if (currentUser?.id === userId) setCurrentUser(c => ({ ...c, balance: newBalance }));
-        return { ...u, balance: newBalance };
+        setDoc(doc(db, "users", String(u.id)), { ...u, balance: newBalance }, { merge: true }); // ☁️ تحديث السحابة
+        return { ...u, balance: newBalance };                                                   
       }
-      return u;
+      return u;                                                                               
     }));
   };
-
+                                                                                            
   // ==========================================
   // 8. إدارة الخدمات والمستخدمين
   // ==========================================
-  const addService = (s) => setServices(prev => [...prev, { ...s, id: `S-${Date.now()}` }]);
-  const updateService = (updatedS) => setServices(prev => prev.map(s => s.id === updatedS.id ? updatedS : s));
-  const deleteService = (id) => setServices(prev => prev.filter(s => s.id !== id));
-  
+  const addService = (s) => {
+    const id = `S-${Date.now()}`;
+    const newS = { ...s, id, _order: Date.now() };
+    setServices(prev => [...prev, newS]);
+    setDoc(doc(db, "services", String(id)), newS); // ☁️ سحابة
+  };
+
+  const updateService = (updatedS) => {
+    setServices(prev => prev.map(s => s.id === updatedS.id ? updatedS : s));                                                                        
+    setDoc(doc(db, "services", String(updatedS.id)), updatedS, { merge: true }); // ☁️ سحابة
+  };
+
+  const deleteService = (id) => {
+    setServices(prev => prev.filter(s => s.id !== id));
+    deleteDoc(doc(db, "services", String(id))); // ☁️ سحابة
+  };
+
   const cloneService = (serviceId) => {
     const original = services.find(s => s.id === serviceId);
     if (original) {
-      const newService = { ...original, id: Date.now(), name: `${original.name} (نسخة)`, isPopular: false, packages: original.packages.map(p => ({ ...p, id: Date.now() + Math.random() })) };
+      const id = Date.now();
+      const newService = { ...original, id: id, name: `${original.name} (نسخة)`, isPopular: false, packages: original.packages.map(p => ({ ...p, id: Date.now() + Math.random() })), _order: Date.now() };
       setServices(prev => [...prev, newService]);
+      setDoc(doc(db, "services", String(id)), newService); // ☁️ سحابة
     }
   };
 
@@ -189,29 +230,67 @@ export const StoreProvider = ({ children }) => {
     const targetIndex = direction === 'up' ? index - 1 : index + 1;
     [newServices[index], newServices[targetIndex]] = [newServices[targetIndex], newServices[index]];
     setServices(newServices);
+    // ☁️ حفظ الترتيب الجديد في السحابة
+    newServices.forEach((s, idx) => setDoc(doc(db, "services", String(s.id)), { _order: idx }, { merge: true }));
   };
 
-  const addUser = (u) => setUsers(prev => [...prev, { ...u, id: `ID-${Date.now().toString().slice(-4)}`, role: 'user', balance: Number(u.balance) || 0, status: 'active' }]);
-  const updateUser = (userId, updatedData) => setUsers(prev => prev.map(u => String(u.id) === String(userId) ? { ...u, ...updatedData } : u));
-  const deleteUser = (id) => setUsers(prev => prev.filter(u => u.id !== id));
-  const toggleDistributor = (userId) => setUsers(prev => prev.map(u => String(u.id) === String(userId) ? { ...u, isDistributor: !u.isDistributor } : u));
-  const addAd = (adData) => setAds(prev => [...prev, typeof adData === 'string' ? { id: Date.now(), image: adData } : { id: Date.now(), ...adData }]);
-  const deleteAd = (id) => setAds(prev => prev.filter(a => a.id !== id));
+  const addUser = (u) => {
+    const newUser = { ...u, id: `ID-${Date.now().toString().slice(-4)}`, role: 'user', balance: Number(u.balance) || 0, status: 'active' };
+    setUsers(prev => [...prev, newUser]);
+    setDoc(doc(db, "users", String(newUser.id)), newUser); // ☁️ سحابة
+  };
+
+  const updateUser = (userId, updatedData) => {
+    setUsers(prev => prev.map(u => String(u.id) === String(userId) ? { ...u, ...updatedData } : u));
+    updateDoc(doc(db, "users", String(userId)), updatedData); // ☁️ سحابة
+  };
+
+  const deleteUser = (id) => {
+    setUsers(prev => prev.filter(u => u.id !== id));
+    deleteDoc(doc(db, "users", String(id))); // ☁️ سحابة
+  };
+
+  const toggleDistributor = (userId) => {
+    setUsers(prev => prev.map(u => {
+      if(String(u.id) === String(userId)){
+        const newVal = !u.isDistributor;
+        updateDoc(doc(db, "users", String(userId)), { isDistributor: newVal }); // ☁️ سحابة
+        return { ...u, isDistributor: newVal };
+      }
+      return u;
+    }));
+  };
+
+  const addAd = (adData) => {
+    const id = Date.now();
+    const newAd = typeof adData === 'string' ? { id, image: adData, _ts: id } : { id, ...adData, _ts: id };
+    setAds(prev => [...prev, newAd]);
+    setDoc(doc(db, "ads", String(id)), newAd); // ☁️ سحابة
+  };
+
+  const deleteAd = (id) => {
+    setAds(prev => prev.filter(a => a.id !== id));
+    deleteDoc(doc(db, "ads", String(id))); // ☁️ سحابة
+  };
+
   const addLog = (action) => setLogs(prev => [{ id: Date.now(), action, time: new Date().toLocaleTimeString('ar-SA') }, ...prev].slice(0, 50));
 
   // ==========================================
   // 9. الإشعارات (المحمية والمحدثة)
   // ==========================================
   const addNotification = (userId, title, message) => {
+    const id = Math.random().toString(36).substr(2, 9);
     const newNotif = {
-      id: Math.random().toString(36).substr(2, 9),
+      id: id,
       userId: String(userId),
       title: title,
       message: message,
-      date: new Date().toLocaleString('ar-YE', { hour12: true })
+      date: new Date().toLocaleString('ar-YE', { hour12: true }),
+      _ts: Date.now() // ☁️ للترتيب
     };
 
     setNotifications(prev => [newNotif, ...prev]);
+    setDoc(doc(db, "notifications", String(id)), newNotif); // ☁️ سحابة
 
     try {
       if ('serviceWorker' in navigator) {
@@ -225,24 +304,27 @@ export const StoreProvider = ({ children }) => {
   };
 
   const sendGlobalNotification = (title, message, target = 'all') => {
-    setNotifications(prev => [{ id: Date.now(), title, message, targetUserId: target, date: new Date().toLocaleString('ar-YE', { hour12: true }) }, ...prev]);
-    
+    const id = Date.now();
+    const newNotif = { id, title, message, targetUserId: target, date: new Date().toLocaleString('ar-YE', { hour12: true }), _ts: id };
+    setNotifications(prev => [newNotif, ...prev]);                      
+    setDoc(doc(db, "notifications", String(id)), newNotif); // ☁️ سحابة
+
     try {
-      if ('serviceWorker' in navigator) {
+      if ('serviceWorker' in navigator) {                                                         
         navigator.serviceWorker.ready.then(reg => {
           reg.showNotification(title, { body: message, icon: settings?.appLogo || '/logo.png', vibrate: [200, 100, 200], dir: 'rtl' });
-        });
-      } else if ("Notification" in window && Notification.permission === "granted") {
+        });                                                                                     
+      } else if ("Notification" in window && Notification.permission === "granted") {             
         new Notification(title, { body: message, icon: settings?.appLogo, dir: 'rtl' });
       }
     } catch (error) { console.log("PWA Notification blocked"); }
   };
-
-  // 🟢 هذا هو السطر اللي كان محذوف ومسبب الشاشة البيضاء!
-  const deleteNotification = (id) => {
+                                                                                            
+  const deleteNotification = (id) => {                                                        
     setNotifications(prev => prev.filter(n => n.id !== id));
-  };
-
+    deleteDoc(doc(db, "notifications", String(id))); // ☁️ سحابة
+  };                                                                                                                                                                                  
+  
   // ==========================================
   // 10. أدوات قاعدة البيانات
   // ==========================================
@@ -254,23 +336,41 @@ export const StoreProvider = ({ children }) => {
   const importDatabase = (json) => {
     try {
       const d = JSON.parse(json);
-      if (d.settings) setSettings(d.settings); if (d.users) setUsers(d.users); if (d.services) setServices(d.services);
-      if (d.telecomData) setTelecomData(d.telecomData); if (d.orders) setOrders(d.orders); if (d.ads) setAds(d.ads);
-      return { success: true, msg: 'تم استيراد قاعدة البيانات بنجاح' };
+      if (d.settings) { setSettings(d.settings); setDoc(doc(db, "store", "settings"), d.settings); }
+      if (d.telecomData) { setTelecomData(d.telecomData); setDoc(doc(db, "store", "telecom"), d.telecomData); }
+      if (d.users) { setUsers(d.users); d.users.forEach(u => setDoc(doc(db, "users", String(u.id)), u)); }
+      if (d.services) { setServices(d.services); d.services.forEach(s => setDoc(doc(db, "services", String(s.id)), s)); }
+      if (d.orders) { setOrders(d.orders); d.orders.forEach(o => setDoc(doc(db, "orders", String(o.id)), o)); }
+      if (d.ads) { setAds(d.ads); d.ads.forEach(a => setDoc(doc(db, "ads", String(a.id)), a)); }
+      
+      return { success: true, msg: 'تم استيراد قاعدة البيانات للسحابة بنجاح ☁️✅' };
     } catch (e) { return { success: false, msg: 'خطأ: الملف المرفوع غير صالح' }; }
   };
-  
-  const updateSettings = (newSet) => setSettings(prev => ({ ...prev, ...newSet }));
+
+  const updateSettings = (newSet) => {
+    setSettings(prev => {
+      const updated = { ...prev, ...newSet };
+      setDoc(doc(db, "store", "settings"), updated); // ☁️ سحابة
+      return updated;
+    });
+  };
+
+  // ☁️ تغليف دالة الاتصالات للسحابة
+  const setTelecomDataCloud = (val) => {
+    setTelecomData(val);
+    const resolvedVal = typeof val === 'function' ? val(telecomData) : val;
+    setDoc(doc(db, "store", "telecom"), resolvedVal);
+  };
 
   // ==========================================
-  // القيمة المصدرة للمشروع بالكامل
+  // القيمة المصدرة للمشروع بالكامل (نفس الترتيب والأسماء تماماً)
   // ==========================================
-  const value = {
+  const value = {                                                                             
     settings, currentUser, users, ads, services, telecomData, orders, notifications, darkMode, logs,
     toggleDarkMode, login, logout, placeOrder, updateSettings, updateAdminSecurity,
     addUser, updateUser, deleteUser, updateUserBalance, toggleDistributor,
     addService, updateService, deleteService, cloneService, reorderService, setServices,
-    addAd, deleteAd, setAds, setTelecomData, updateOrderStatus, setOrders,
+    addAd, deleteAd, setAds, setTelecomData: setTelecomDataCloud, updateOrderStatus, setOrders,
     addNotification, sendGlobalNotification, deleteNotification, exportDatabase, importDatabase
   };
 

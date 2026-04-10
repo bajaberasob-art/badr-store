@@ -3,25 +3,29 @@ import { useStore } from '../../../context/StoreContext';
 import {
   TrendingUp, ShoppingCart, Users, Activity,
   CheckCircle2, XCircle, Package, ArrowUpRight,
-  Wallet, AlertCircle, Clock, User, Copy, Check, 
+  Wallet, AlertCircle, Clock, User, Copy, Check,
   Gamepad2, Hash, MessageSquareX, Zap, ZapOff
 } from 'lucide-react';
 
 export default function DashboardTab() {
-  const { orders = [], users = [], services = [], updateOrderStatus, updateUserBalance, addNotification } = useStore();
+  // 🟢 جلب currentUser لمعرفة صلاحيات الشخص اللي داخل
+  const { orders = [], users = [], services = [], updateOrderStatus, updateUserBalance, addNotification, currentUser } = useStore();
 
   const [confirmModal, setConfirmModal] = useState(null);
   const [rejectReason, setRejectReason] = useState('');
   const [copiedId, setCopiedId] = useState(null);
 
-  // 🟢 حساب الإحصائيات بذكاء
+  // 🟢 التحقق هل الشخص هذا "مساعد" ولا "المدير العام (أنت)"
+  const isAssistant = currentUser?.role === 'assistant';
+
+  // حساب الإحصائيات بذكاء
   const stats = useMemo(() => {
     const pending = orders.filter(o => o.status === 'pending');
     const accepted = orders.filter(o => o.status === 'accepted');
-    
+
     // إجمالي الإيرادات
     const totalRevenue = accepted.reduce((sum, o) => sum + (Number(o.price) || 0), 0);
-    
+
     // تقسيم الإيرادات (ألعاب vs اتصالات)
     const telecomRev = accepted.filter(o => o.serviceName?.includes('سداد')).reduce((sum, o) => sum + (Number(o.price) || 0), 0);
     const gamesRev = totalRevenue - telecomRev;
@@ -39,7 +43,6 @@ export default function DashboardTab() {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  // فتح نافذة التأكيد
   const openConfirm = (type, order) => {
     setRejectReason('');
     setConfirmModal({ type, order });
@@ -77,7 +80,7 @@ export default function DashboardTab() {
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-6 duration-700 pb-20" dir="rtl">
-      
+
       {/* نافذة التأكيد الفخمة */}
       {confirmModal && (
         <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in">
@@ -87,7 +90,7 @@ export default function DashboardTab() {
               </div>
               <h3 className="text-2xl font-black text-white mb-2">{confirmModal.type === 'accept' ? 'تأكيد التنفيذ' : 'رفض وإرجاع المبلغ'}</h3>
               <p className="text-sm font-bold text-gray-400 mb-6">الزبون: {confirmModal.order.userName}</p>
-              
+
               {confirmModal.type === 'reject' && (
                 <div className="mb-6 text-right">
                    <textarea value={rejectReason} onChange={e => setRejectReason(e.target.value)} placeholder="اكتب سبب الرفض هنا..." className="w-full bg-black/50 border border-white/10 rounded-2xl p-4 text-sm font-bold text-white outline-none focus:border-red-500/50 h-24" />
@@ -102,24 +105,26 @@ export default function DashboardTab() {
         </div>
       )}
 
-      {/* 1. قسم الكروت الإحصائية */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard title="إجمالي الإيرادات" value={`${stats.totalRevenue.toLocaleString()} ر.ي`} subValue={`🎮 ${stats.gamesRev.toLocaleString()} | 📱 ${stats.telecomRev.toLocaleString()}`} icon={Wallet} color="text-green-500" glowColor="bg-green-500" />
-        <StatCard title="طلبات الانتظار" value={stats.pending.length} subValue="بانتظار التحويل أو التنفيذ" icon={Clock} color="text-orange-500" glowColor="bg-orange-500" />
-        <StatCard title="العملاء النشطين" value={stats.customers} subValue="إجمالي المسجلين في المتجر" icon={Users} color="text-blue-500" glowColor="bg-blue-500" />
-        <StatCard title="الخدمات" value={services.length} subValue="عدد المنتجات المتاحة حالياً" icon={Package} color="text-purple-500" glowColor="bg-purple-500" />
-      </div>
+      {/* 🟢 إخفاء كروت الإحصائيات والفلوس إذا كان الدخول من حساب مساعد */}
+      {!isAssistant && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <StatCard title="إجمالي الإيرادات" value={`${stats.totalRevenue.toLocaleString()} ر.ي`} subValue={`🎮 ${stats.gamesRev.toLocaleString()} | 📱 ${stats.telecomRev.toLocaleString()}`} icon={Wallet} color="text-green-500" glowColor="bg-green-500" />
+          <StatCard title="طلبات الانتظار" value={stats.pending.length} subValue="بانتظار التحويل أو التنفيذ" icon={Clock} color="text-orange-500" glowColor="bg-orange-500" />
+          <StatCard title="العملاء النشطين" value={stats.customers} subValue="إجمالي المسجلين في المتجر" icon={Users} color="text-blue-500" glowColor="bg-blue-500" />
+          <StatCard title="الخدمات" value={services.length} subValue="عدد المنتجات المتاحة حالياً" icon={Package} color="text-purple-500" glowColor="bg-purple-500" />
+        </div>
+      )}
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
-        
-        {/* 2. الطلبات الواردة (النظام المقسم الجديد) */}
-        <div className="xl:col-span-2 bg-[#121217] rounded-[3rem] border border-white/5 overflow-hidden shadow-2xl relative">
+
+        {/* 2. الطلبات الواردة (تتوسع الشاشة كاملة للمساعد عشان يركز) */}
+        <div className={`${isAssistant ? 'xl:col-span-3' : 'xl:col-span-2'} bg-[#121217] rounded-[3rem] border border-white/5 overflow-hidden shadow-2xl relative`}>
           <div className="p-8 border-b border-white/5 flex justify-between items-center bg-white/[0.01]">
             <div className="flex items-center gap-3">
                <div className="w-3 h-3 bg-orange-500 rounded-full animate-pulse shadow-[0_0_15px_#f97316]"></div>
                <h3 className="font-black text-white text-xl">الرادار: طلبات واردة</h3>
             </div>
-            <button className="text-[10px] font-black text-gray-500 bg-white/5 px-4 py-2 rounded-full border border-white/5">استعراض الكل</button>
+            <button className="text-[10px] font-black text-gray-500 bg-white/5 px-4 py-2 rounded-full border border-white/5 hover:text-white transition-colors">استعراض الكل</button>
           </div>
 
           <div className="p-6 max-h-[600px] overflow-y-auto custom-scrollbar">
@@ -134,10 +139,10 @@ export default function DashboardTab() {
                   const parts = (order.details || '').split('|');
                   const packageInfo = parts[0]?.trim() || 'باقة غير محددة';
                   const playerInfo = parts[1] ? parts[1].replace('بيانات:', '').replace('رقم:', '').trim() : '';
-                  
+
                   return (
                     <div key={order.id} className="bg-black/40 p-6 rounded-[2.2rem] border border-white/5 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 group hover:border-orange-500/30 transition-all duration-500">
-                      
+
                       <div className="flex items-center gap-5 flex-1">
                         <div className="w-16 h-16 bg-white/5 rounded-2xl flex items-center justify-center text-orange-500 border border-white/5 group-hover:scale-110 transition-transform shadow-inner">
                            <Package size={28} />
@@ -147,8 +152,7 @@ export default function DashboardTab() {
                               <h4 className="font-black text-white text-lg leading-none mb-1">{order.serviceName}</h4>
                               <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest"><User size={10} className="inline ml-1" /> {order.userName} • ID: {String(order.id).substring(0,6)}</p>
                            </div>
-                           
-                           {/* تقسيم التفاصيل */}
+
                            <div className="flex flex-wrap gap-2">
                               <span className="bg-[#18181c] text-[11px] font-bold text-gray-300 px-3 py-1.5 rounded-xl border border-white/5 flex items-center gap-1.5">
                                  <Gamepad2 size={12} className="text-gray-500" /> {packageInfo}
@@ -163,6 +167,7 @@ export default function DashboardTab() {
                       </div>
 
                       <div className="flex items-center gap-4 w-full lg:w-auto justify-between lg:justify-end border-t lg:border-t-0 border-white/5 pt-5 lg:pt-0">
+                        {/* 🟢 إخفاء السعر عن المساعد إذا حبيت (اختياري)، حالياً خليناه يشوف السعر عشان يعرف حجم الطلب */}
                         <div className="text-right">
                            <span className="text-2xl font-black text-white tracking-tighter">{order.price?.toLocaleString()} <small className="text-[10px] text-gray-500">ر.ي</small></span>
                         </div>
@@ -180,39 +185,41 @@ export default function DashboardTab() {
           </div>
         </div>
 
-        {/* 3. الحالة والنصائح */}
-        <div className="flex flex-col gap-6">
-           <div className="bg-[#121217] rounded-[2.5rem] border border-white/5 p-8 text-center space-y-6 shadow-2xl relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-orange-500/10 blur-[50px] rounded-full pointer-events-none"></div>
-              <div className="w-20 h-20 bg-gradient-to-tr from-orange-500 to-red-600 rounded-[1.8rem] flex items-center justify-center text-black shadow-xl mx-auto rotate-3">
-                 <Activity size={36} />
-              </div>
-              <div>
-                 <h4 className="text-xl font-black text-white">نبض المتجر</h4>
-                 <p className="text-[11px] font-bold text-gray-500 mt-2">النظام يعمل بكفاءة 100% وبدون أي مشاكل تقنية.</p>
-              </div>
-              <div className="space-y-3">
-                 <div className="flex justify-between items-center bg-black/40 p-4 rounded-2xl border border-white/5 shadow-inner">
-                    <span className="text-[10px] text-gray-500 font-black uppercase">سرعة الاستجابة:</span>
-                    <span className="text-xs text-green-500 font-black tracking-widest">خارق 🔥</span>
-                 </div>
-                 <div className="flex justify-between items-center bg-black/40 p-4 rounded-2xl border border-white/5 shadow-inner">
-                    <span className="text-[10px] text-gray-500 font-black uppercase">حالة السيرفر:</span>
-                    <span className="text-xs text-blue-500 font-black tracking-widest">مستقر ⚡</span>
-                 </div>
-              </div>
-           </div>
+        {/* 🟢 إخفاء قسم "النبض" و "النصائح" عن المساعدين لأنها لك أنت كمدير */}
+        {!isAssistant && (
+          <div className="flex flex-col gap-6">
+             <div className="bg-[#121217] rounded-[2.5rem] border border-white/5 p-8 text-center space-y-6 shadow-2xl relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-orange-500/10 blur-[50px] rounded-full pointer-events-none"></div>
+                <div className="w-20 h-20 bg-gradient-to-tr from-orange-500 to-red-600 rounded-[1.8rem] flex items-center justify-center text-black shadow-xl mx-auto rotate-3">
+                   <Activity size={36} />
+                </div>
+                <div>
+                   <h4 className="text-xl font-black text-white">نبض المتجر</h4>
+                   <p className="text-[11px] font-bold text-gray-500 mt-2">النظام يعمل بكفاءة 100% وبدون أي مشاكل تقنية.</p>
+                </div>
+                <div className="space-y-3">
+                   <div className="flex justify-between items-center bg-black/40 p-4 rounded-2xl border border-white/5 shadow-inner">
+                      <span className="text-[10px] text-gray-500 font-black uppercase">سرعة الاستجابة:</span>
+                      <span className="text-xs text-green-500 font-black tracking-widest">خارق 🔥</span>
+                   </div>
+                   <div className="flex justify-between items-center bg-black/40 p-4 rounded-2xl border border-white/5 shadow-inner">
+                      <span className="text-[10px] text-gray-500 font-black uppercase">حالة السيرفر:</span>
+                      <span className="text-xs text-blue-500 font-black tracking-widest">مستقر ⚡</span>
+                   </div>
+                </div>
+             </div>
 
-           <div className="bg-gradient-to-br from-orange-500/10 to-transparent p-6 rounded-[2.2rem] border border-orange-500/10 space-y-3">
-              <div className="flex items-center gap-2">
-                 <AlertCircle size={16} className="text-orange-500" />
-                 <h5 className="text-xs font-black text-white uppercase">مركز التلميحات</h5>
-              </div>
-              <p className="text-[11px] text-gray-400 font-bold leading-relaxed">
-                 عند رفض طلب، حاول دائماً كتابة السبب (مثلاً: الآيدي غلط) لتقليل استفسارات الزبائن وتوفير وقتك.
-              </p>
-           </div>
-        </div>
+             <div className="bg-gradient-to-br from-orange-500/10 to-transparent p-6 rounded-[2.2rem] border border-orange-500/10 space-y-3">
+                <div className="flex items-center gap-2">
+                   <AlertCircle size={16} className="text-orange-500" />
+                   <h5 className="text-xs font-black text-white uppercase">مركز التلميحات</h5>
+                </div>
+                <p className="text-[11px] text-gray-400 font-bold leading-relaxed">
+                   عند رفض طلب، حاول دائماً كتابة السبب (مثلاً: الآيدي غلط) لتقليل استفسارات الزبائن وتوفير وقتك.
+                </p>
+             </div>
+          </div>
+        )}
 
       </div>
     </div>

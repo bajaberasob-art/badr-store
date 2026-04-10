@@ -3,7 +3,8 @@ import { useStore } from '../../../context/StoreContext';
 import {
   X, Smartphone, Wifi, Mic, Calendar, Info,
   CheckCircle2, XCircle, ShieldAlert, Zap, History,
-  LayoutGrid, Phone, Gift, AlertTriangle, ChevronLeft, Percent
+  LayoutGrid, Phone, Gift, AlertTriangle, ChevronLeft, Percent,
+  Loader2, Contact // 🟢 أضفنا أيقونات التحميل وجهات الاتصال
 } from 'lucide-react';
 
 export default function TelecomTab({ onBack }) {
@@ -16,8 +17,10 @@ export default function TelecomTab({ onBack }) {
   const [recentPhones, setRecentPhones] = useState([]);
   const [activeFilter, setActiveFilter] = useState('all');
   const [confirmData, setConfirmData] = useState(null);
+  
+  // 🟢 حالة التحميل لمنع النقرات المزدوجة (حماية الفلوس)
+  const [isProcessing, setIsProcessing] = useState(false);
 
-  // 🟢 جلب نسبة ضريبة بوابة الشمال من الإعدادات (الافتراضي 210)
   const northGateRatio = Number(settings?.northGateTax) || 210;
 
   useEffect(() => {
@@ -25,7 +28,6 @@ export default function TelecomTab({ onBack }) {
     if (saved) setRecentPhones(JSON.parse(saved));
   }, []);
 
-  // 🟢 محرك التعرف الذكي على الشبكة
   useEffect(() => {
     const p = phone.trim();
     if (p.startsWith('77') || p.startsWith('78')) setNetwork('Yemen Mobile');
@@ -35,7 +37,6 @@ export default function TelecomTab({ onBack }) {
     else if (p.startsWith('0')) setNetwork('DSL Yemen');
     else if (p.startsWith('10')) setNetwork('Yemen 4G');
 
-    // إعادة تعيين بوابة الشمال إذا تغيرت الشبكة (حصرية ليمن موبايل)
     if (!p.startsWith('77') && !p.startsWith('78')) setNorthGate(false);
   }, [phone]);
 
@@ -49,7 +50,6 @@ export default function TelecomTab({ onBack }) {
   };
 
   const activeNet = netThemes[network] || netThemes['Yemen Mobile'];
-
   const networkPackages = telecomData?.[network]?.packages || [];
   const networkInstant = telecomData?.[network]?.instant || [];
 
@@ -65,49 +65,78 @@ export default function TelecomTab({ onBack }) {
     });
   }, [networkPackages, activeFilter]);
 
-  // 🟢 دالة حساب السعر النهائي (بالنسبة المئوية الحقيقية)
   const getFinalPrice = (basePrice) => {
     if (network === 'Yemen Mobile' && northGate) {
-      // السعر الأساسي × (النسبة ÷ 100)
       return Math.round(Number(basePrice) * (northGateRatio / 100));
     }
     return Number(basePrice);
   };
 
-  // 1. التجهيز للمراجعة قبل الطلب (الفاتورة التفصيلية)
+  // 🟢 دالة فتح جهات الاتصال الذكية (PWA API)
+  const handlePickContact = async () => {
+    const supported = ('contacts' in navigator && 'ContactsManager' in window);
+    if (!supported) {
+      alert('عذراً يا غالي، متصفحك أو جهازك لا يدعم جلب الأسماء مباشرة. يرجى كتابة الرقم يدوياً.');
+      return;
+    }
+    try {
+      const contacts = await navigator.contacts.select(['tel'], { multiple: false });
+      if (contacts.length > 0 && contacts[0].tel.length > 0) {
+        // تنظيف الرقم من المسافات والمفاتيح الدولية (+967)
+        let rawNum = contacts[0].tel[0].replace(/\D/g, '');
+        if (rawNum.startsWith('967')) rawNum = rawNum.substring(3);
+        if (rawNum.startsWith('00967')) rawNum = rawNum.substring(5);
+        
+        // أخذ أول 9 أرقام فقط
+        const finalNum = rawNum.slice(0, 9);
+        setPhone(finalNum);
+      }
+    } catch (err) {
+      console.log('تم إلغاء أو فشل جلب جهة الاتصال');
+    }
+  };
+
   const handlePreConfirm = (item) => {
     if (!phone || phone.length < 9) {
       return setCustomAlert({ type: 'error', title: 'رقم غير صالح', msg: 'يا وحش، الرجاء إدخال رقم هاتف صحيح! 📱' });
     }
-
     const finalPrice = getFinalPrice(item.price);
-
     setConfirmData({
       pkg: item,
       details: `شبكة ${activeNet.label} - ${item.name} | رقم: ${phone} ${northGate ? `(نظام بوابة الشمال ${northGateRatio}%)` : ''}`,
-      price: finalPrice 
+      price: finalPrice
     });
   };
 
-  // 2. التنفيذ الفعلي
-  const executeTelecomOrder = () => {
-    const { details, price, pkg } = confirmData;
-    const res = placeOrder('سداد اتصالات', details, price);
+  // 🟢 دالة التنفيذ مع حماية النقرات المزدوجة
+  const executeTelecomOrder = async () => {
+    if (isProcessing) return; // منع التكرار
+    setIsProcessing(true); // تشغيل التحميل
 
-    setConfirmData(null);
+    try {
+      const { details, price, pkg } = confirmData;
+      // انتظار الرد من السحابة
+      const res = await placeOrder('سداد اتصالات', details, price);
 
-    if (res && res.success) {
-      const updatedRecents = [...new Set([phone, ...recentPhones])].slice(0, 4);
-      setRecentPhones(updatedRecents);
-      localStorage.setItem('badr_recent_phones', JSON.stringify(updatedRecents));
+      setConfirmData(null);
 
-      setCustomAlert({
-        type: 'success',
-        title: 'تم إرسال طلب السداد!',
-        msg: `تم طلب "${pkg.name}" للرقم ${phone} بنجاح.\nجاري التنفيذ وتقدر تتابعه من السجل.`
-      });
-    } else {
-      setCustomAlert({ type: 'error', title: 'فشل السداد', msg: res?.msg || 'عذراً، رصيدك غير كافٍ لإتمام العملية.' });
+      if (res && res.success) {
+        const updatedRecents = [...new Set([phone, ...recentPhones])].slice(0, 4);
+        setRecentPhones(updatedRecents);
+        localStorage.setItem('badr_recent_phones', JSON.stringify(updatedRecents));
+
+        setCustomAlert({
+          type: 'success',
+          title: 'تم إرسال طلب السداد!',
+          msg: `تم طلب "${pkg.name}" للرقم ${phone} بنجاح.\nجاري التنفيذ وتقدر تتابعه من السجل.`
+        });
+      } else {
+        setCustomAlert({ type: 'error', title: 'فشل السداد', msg: res?.msg || 'عذراً، رصيدك غير كافٍ لإتمام العملية.' });
+      }
+    } catch (error) {
+      setCustomAlert({ type: 'error', title: 'خطأ بالاتصال', msg: 'حدث خطأ غير متوقع، يرجى المحاولة لاحقاً.' });
+    } finally {
+      setIsProcessing(false); // إيقاف التحميل
     }
   };
 
@@ -118,20 +147,16 @@ export default function TelecomTab({ onBack }) {
 
   return (
     <div className="absolute inset-0 bg-[#050505] z-50 overflow-y-auto pb-40 animate-in slide-in-from-bottom-10 duration-500" dir="rtl">
-      
-      {/* خلفية ديناميكية */}
+
       <div className="absolute inset-0 z-0 pointer-events-none transition-opacity duration-1000 opacity-30">
         <img src={activeNet.bg} className="w-full h-full object-cover mix-blend-screen" alt="background" />
         <div className="absolute inset-0 bg-gradient-to-b from-[#050505]/40 via-[#050505]/90 to-[#050505]"></div>
       </div>
 
-      {/* 🟢 نافذة التأكيد الفخمة (الفاتورة) */}
       {confirmData && (
         <div className="fixed inset-0 z-[110] bg-[#050505]/95 backdrop-blur-xl flex items-center justify-center p-6 animate-in zoom-in-95 duration-300">
           <div className="bg-[#121217] border border-white/10 p-8 rounded-[3rem] shadow-[0_20px_50px_rgba(0,0,0,0.5)] w-full max-w-sm relative overflow-hidden">
-             
              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-32 blur-[60px] opacity-40 pointer-events-none" style={{ backgroundColor: activeNet.color }}></div>
-
              <div className="w-20 h-20 rounded-[2rem] mx-auto flex items-center justify-center mb-6 shadow-xl relative z-10" style={{ backgroundColor: `${activeNet.color}20`, color: activeNet.color, border: `1px solid ${activeNet.color}40` }}>
                 <AlertTriangle size={36} />
              </div>
@@ -147,13 +172,10 @@ export default function TelecomTab({ onBack }) {
                    <span className="text-[10px] text-gray-500 font-black uppercase">رقم الهاتف</span>
                    <span className="text-sm font-black tracking-widest" style={{ color: activeNet.color }} dir="ltr">{phone}</span>
                 </div>
-                
-                {/* تفصيل السعر للزبون */}
                 <div className="flex justify-between items-center border-b border-white/5 pb-3">
                    <span className="text-[10px] text-gray-500 font-black uppercase">السعر الأساسي</span>
                    <span className="text-xs text-white font-black">{Number(confirmData.pkg.price).toLocaleString()} <small className="text-[9px] opacity-70">ر.ي</small></span>
                 </div>
-
                 {network === 'Yemen Mobile' && northGate && (
                   <div className="flex justify-between items-center border-b border-white/5 pb-3">
                      <span className="text-[10px] text-red-500 font-black uppercase">رسوم التحويل ({northGateRatio}%)</span>
@@ -162,7 +184,6 @@ export default function TelecomTab({ onBack }) {
                      </span>
                   </div>
                 )}
-
                 <div className="flex justify-between items-center pt-1">
                    <span className="text-[11px] text-gray-400 font-black uppercase">الإجمالي المخصوم</span>
                    <span className="text-2xl text-white font-black">{(confirmData.price).toLocaleString()} <small className="text-[10px] opacity-50">ر.ي</small></span>
@@ -170,14 +191,27 @@ export default function TelecomTab({ onBack }) {
              </div>
 
              <div className="flex gap-3 relative z-10">
-                <button onClick={executeTelecomOrder} className="flex-1 py-4 rounded-[2rem] text-black font-black text-sm active:scale-95 transition-all shadow-lg" style={{ backgroundColor: activeNet.color }}>تأكيد واخصم</button>
-                <button onClick={() => setConfirmData(null)} className="flex-1 py-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-[2rem] text-white font-black text-sm active:scale-95 transition-all">تعديل</button>
+                {/* 🟢 زر الدفع مع تأثير التحميل والحماية */}
+                <button 
+                  onClick={executeTelecomOrder} 
+                  disabled={isProcessing}
+                  className="flex-1 py-4 rounded-[2rem] text-black font-black text-sm transition-all shadow-lg flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed" 
+                  style={{ backgroundColor: activeNet.color }}
+                >
+                  {isProcessing ? <><Loader2 size={18} className="animate-spin" /> جاري التنفيذ...</> : 'تأكيد واخصم'}
+                </button>
+                <button 
+                  onClick={() => setConfirmData(null)} 
+                  disabled={isProcessing}
+                  className="flex-1 py-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-[2rem] text-white font-black text-sm transition-all disabled:opacity-50"
+                >
+                  تعديل
+                </button>
              </div>
           </div>
         </div>
       )}
 
-      {/* التنبيهات (تم السداد / خطأ) */}
       {customAlert && (
         <div className="fixed inset-0 z-[120] bg-black/80 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in duration-300">
           <div className="bg-[#121217] border border-white/10 p-8 rounded-[3rem] text-center shadow-2xl w-full max-w-sm animate-in zoom-in-95 duration-300">
@@ -193,7 +227,6 @@ export default function TelecomTab({ onBack }) {
         </div>
       )}
 
-      {/* الهيدر */}
       <div className="sticky top-0 z-30 px-6 py-6 flex justify-between items-center bg-black/20 backdrop-blur-3xl border-b border-white/5">
          <div className="flex items-center gap-4">
             <div className="w-12 h-12 rounded-[1.2rem] flex items-center justify-center font-black text-white shadow-2xl transition-colors duration-500" style={{ backgroundColor: activeNet.color }}>
@@ -209,17 +242,33 @@ export default function TelecomTab({ onBack }) {
 
       <div className="p-5 space-y-8 mt-4 relative z-10">
 
-        {/* منطقة إدخال الرقم */}
         <div className="relative group">
            <div className="absolute inset-0 blur-3xl opacity-20 transition-colors duration-700 rounded-[3rem]" style={{ backgroundColor: activeNet.color }}></div>
 
            <div className="relative bg-[#0a0a0c]/80 backdrop-blur-xl p-8 rounded-[3rem] border-2 transition-colors duration-500 shadow-2xl" style={{ borderColor: phone.length > 0 ? `${activeNet.color}66` : '#ffffff10' }}>
-              <label className="block text-[10px] font-black text-gray-400 uppercase tracking-[0.4em] mb-6 text-center">أدخل رقم الهاتف للتعرف على الشبكة</label>
+              <div className="flex justify-between items-center mb-6">
+                <label className="block text-[10px] font-black text-gray-400 uppercase tracking-[0.4em]">رقم الهاتف</label>
+                
+                {/* 🟢 زر فتح جهات الاتصال الذكي */}
+                {('contacts' in navigator && 'ContactsManager' in window) && (
+                  <button 
+                    onClick={handlePickContact}
+                    className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-full transition-all active:scale-95"
+                    style={{ color: activeNet.color }}
+                  >
+                    <Contact size={14} /> جهات الاتصال
+                  </button>
+                )}
+              </div>
 
               <input
                  type="tel"
+                 maxLength="9"
                  value={phone}
-                 onChange={e => setPhone(e.target.value)}
+                 onChange={e => {
+                   const val = e.target.value.replace(/\D/g, '').slice(0, 9);
+                   setPhone(val);
+                 }}
                  placeholder="7XXXXXXXX"
                  className="w-full bg-transparent text-white text-5xl font-black text-center outline-none tracking-[0.2em] placeholder:text-gray-800 transition-colors duration-300 drop-shadow-lg"
                  style={{ color: phone.length > 0 ? activeNet.color : 'white' }}
@@ -239,7 +288,6 @@ export default function TelecomTab({ onBack }) {
                 </div>
               )}
 
-              {/* 🟢 نظام بوابة الشمال (يظهر ليمن موبايل فقط) */}
               {network === 'Yemen Mobile' && (
                 <div className="mt-8 pt-6 border-t border-white/5 flex justify-between items-center px-2 animate-in fade-in slide-in-from-bottom-2">
                    <div className="flex items-center gap-3">
@@ -258,13 +306,11 @@ export default function TelecomTab({ onBack }) {
            </div>
         </div>
 
-        {/* أزرار التبديل */}
         <div className="flex bg-[#0a0a0c]/80 backdrop-blur-md p-2 rounded-[1.8rem] border border-white/5 shadow-inner">
            <button onClick={() => setTab('packages')} className={`flex-1 py-4 rounded-2xl font-black text-[11px] transition-all duration-300 ${tab === 'packages' ? 'text-white shadow-lg' : 'text-gray-500'}`} style={{ backgroundColor: tab === 'packages' ? activeNet.color : 'transparent' }}>باقات ذكية</button>
            <button onClick={() => setTab('instant')} className={`flex-1 py-4 rounded-2xl font-black text-[11px] transition-all duration-300 ${tab === 'instant' ? 'text-white shadow-lg' : 'text-gray-500'}`} style={{ backgroundColor: tab === 'instant' ? activeNet.color : 'transparent' }}>شحن فوري (رصيد)</button>
         </div>
 
-        {/* 🟢 قسم الباقات */}
         {tab === 'packages' && (
           <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
              {networkPackages.length > 0 && (
@@ -295,7 +341,6 @@ export default function TelecomTab({ onBack }) {
                    className="w-full bg-[#0d0d0f]/90 backdrop-blur-md p-6 rounded-[2.2rem] border border-white/5 flex flex-col gap-5 hover:bg-[#121217] active:scale-[0.97] transition-all relative overflow-hidden group shadow-xl text-right"
                 >
                    <div className="absolute top-0 right-0 w-1.5 h-full opacity-60 transition-colors duration-500" style={{ backgroundColor: activeNet.color }}></div>
-
                    <div className="flex justify-between items-start w-full">
                       <div className="flex-1">
                          <h4 className="font-black text-white text-base mb-1">{p.name}</h4>
@@ -308,7 +353,6 @@ export default function TelecomTab({ onBack }) {
                          {network === 'Yemen Mobile' && northGate && <span className="text-[8px] bg-red-500/20 text-red-500 px-2 py-0.5 rounded-full border border-red-500/30">شامل بوابة الشمال</span>}
                       </div>
                    </div>
-
                    <div className="flex justify-between items-center w-full bg-black/50 p-4 rounded-2xl border border-white/5">
                       <div className="flex flex-col items-center gap-1"><Wifi size={14} className="text-gray-500" /><span className="text-[10px] text-white font-black">{p.mb || '-'}</span></div>
                       <div className="w-[1px] h-4 bg-white/10"></div>
@@ -328,7 +372,6 @@ export default function TelecomTab({ onBack }) {
           </div>
         )}
 
-        {/* 🟢 قسم الشحن الفوري */}
         {tab === 'instant' && (
           <div className="grid grid-cols-2 gap-4 animate-in fade-in slide-in-from-left-4 duration-300">
              {networkInstant.length > 0 ? (

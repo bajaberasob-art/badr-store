@@ -52,7 +52,6 @@ export default function DashboardTab() {
     const { type, order } = confirmModal;
     if (type === 'reject') {
       updateOrderStatus(order.id, 'rejected');
-      updateUserBalance(order.userId, order.price);
       const finalReason = rejectReason.trim() ? `السبب: ${rejectReason}` : 'تم إرجاع المبلغ لرصيدك.';
       if (addNotification) addNotification(order.userId, `إرجاع رصيد ${order.price} ر.ي 🔄`, finalReason);
     } else {

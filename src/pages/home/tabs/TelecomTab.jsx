@@ -4,7 +4,7 @@ import {
   X, Smartphone, Wifi, Mic, Calendar, Info,
   CheckCircle2, XCircle, ShieldAlert, Zap, History,
   LayoutGrid, Phone, Gift, AlertTriangle, ChevronLeft, Percent,
-  Loader2, Contact // 🟢 أضفنا أيقونات التحميل وجهات الاتصال
+  Loader2, Contact
 } from 'lucide-react';
 
 export default function TelecomTab({ onBack }) {
@@ -17,10 +17,8 @@ export default function TelecomTab({ onBack }) {
   const [recentPhones, setRecentPhones] = useState([]);
   const [activeFilter, setActiveFilter] = useState('all');
   const [confirmData, setConfirmData] = useState(null);
-  
-  // 🟢 حالة التحميل لمنع النقرات المزدوجة (حماية الفلوس)
-  const [isProcessing, setIsProcessing] = useState(false);
 
+  const [isProcessing, setIsProcessing] = useState(false);
   const northGateRatio = Number(settings?.northGateTax) || 210;
 
   useEffect(() => {
@@ -72,7 +70,6 @@ export default function TelecomTab({ onBack }) {
     return Number(basePrice);
   };
 
-  // 🟢 دالة فتح جهات الاتصال الذكية (PWA API)
   const handlePickContact = async () => {
     const supported = ('contacts' in navigator && 'ContactsManager' in window);
     if (!supported) {
@@ -82,12 +79,9 @@ export default function TelecomTab({ onBack }) {
     try {
       const contacts = await navigator.contacts.select(['tel'], { multiple: false });
       if (contacts.length > 0 && contacts[0].tel.length > 0) {
-        // تنظيف الرقم من المسافات والمفاتيح الدولية (+967)
         let rawNum = contacts[0].tel[0].replace(/\D/g, '');
         if (rawNum.startsWith('967')) rawNum = rawNum.substring(3);
         if (rawNum.startsWith('00967')) rawNum = rawNum.substring(5);
-        
-        // أخذ أول 9 أرقام فقط
         const finalNum = rawNum.slice(0, 9);
         setPhone(finalNum);
       }
@@ -108,14 +102,12 @@ export default function TelecomTab({ onBack }) {
     });
   };
 
-  // 🟢 دالة التنفيذ مع حماية النقرات المزدوجة
   const executeTelecomOrder = async () => {
-    if (isProcessing) return; // منع التكرار
-    setIsProcessing(true); // تشغيل التحميل
+    if (isProcessing) return;
+    setIsProcessing(true);
 
     try {
       const { details, price, pkg } = confirmData;
-      // انتظار الرد من السحابة
       const res = await placeOrder('سداد اتصالات', details, price);
 
       setConfirmData(null);
@@ -136,7 +128,7 @@ export default function TelecomTab({ onBack }) {
     } catch (error) {
       setCustomAlert({ type: 'error', title: 'خطأ بالاتصال', msg: 'حدث خطأ غير متوقع، يرجى المحاولة لاحقاً.' });
     } finally {
-      setIsProcessing(false); // إيقاف التحميل
+      setIsProcessing(false);
     }
   };
 
@@ -146,38 +138,37 @@ export default function TelecomTab({ onBack }) {
   };
 
   return (
-    <div className="absolute inset-0 bg-[#050505] z-50 overflow-y-auto pb-40 animate-in slide-in-from-bottom-10 duration-500" dir="rtl">
-
-      <div className="absolute inset-0 z-0 pointer-events-none transition-opacity duration-1000 opacity-30">
-        <img src={activeNet.bg} className="w-full h-full object-cover mix-blend-screen" alt="background" />
-        <div className="absolute inset-0 bg-gradient-to-b from-[#050505]/40 via-[#050505]/90 to-[#050505]"></div>
+    <div className="absolute inset-0 bg-gray-50 dark:bg-[#050505] z-50 overflow-y-auto pb-40 animate-in slide-in-from-bottom-10 duration-500 transition-colors" dir="rtl">
+      <div className="absolute inset-0 z-0 pointer-events-none transition-opacity duration-1000 opacity-10 dark:opacity-30">
+        <img src={activeNet.bg} className="w-full h-full object-cover dark:mix-blend-screen" alt="background" />
+        <div className="absolute inset-0 bg-gradient-to-b from-white/40 via-gray-50/90 to-gray-50 dark:from-[#050505]/40 dark:via-[#050505]/90 dark:to-[#050505]"></div>
       </div>
 
       {confirmData && (
-        <div className="fixed inset-0 z-[110] bg-[#050505]/95 backdrop-blur-xl flex items-center justify-center p-6 animate-in zoom-in-95 duration-300">
-          <div className="bg-[#121217] border border-white/10 p-8 rounded-[3rem] shadow-[0_20px_50px_rgba(0,0,0,0.5)] w-full max-w-sm relative overflow-hidden">
-             <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-32 blur-[60px] opacity-40 pointer-events-none" style={{ backgroundColor: activeNet.color }}></div>
-             <div className="w-20 h-20 rounded-[2rem] mx-auto flex items-center justify-center mb-6 shadow-xl relative z-10" style={{ backgroundColor: `${activeNet.color}20`, color: activeNet.color, border: `1px solid ${activeNet.color}40` }}>
+        <div className="fixed inset-0 z-[110] bg-black/60 dark:bg-[#050505]/95 backdrop-blur-xl flex items-center justify-center p-6 animate-in zoom-in-95 duration-300">
+          <div className="bg-white dark:bg-[#121217] border border-gray-200 dark:border-white/10 p-8 rounded-[3rem] shadow-[0_20px_50px_rgba(0,0,0,0.2)] dark:shadow-[0_20px_50px_rgba(0,0,0,0.5)] w-full max-w-sm relative overflow-hidden transition-colors">
+             <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-32 blur-[60px] opacity-20 dark:opacity-40 pointer-events-none" style={{ backgroundColor: activeNet.color }}></div>
+             <div className="w-20 h-20 rounded-[2rem] mx-auto flex items-center justify-center mb-6 shadow-xl relative z-10" style={{ backgroundColor: `${activeNet.color}15`, color: activeNet.color, border: `1px solid ${activeNet.color}40` }}>
                 <AlertTriangle size={36} />
              </div>
-             <h3 className="text-2xl font-black text-white mb-2 text-center relative z-10">فاتورة السداد</h3>
-             <p className="text-[11px] font-bold text-gray-400 mb-6 text-center relative z-10">يرجى مراجعة التفاصيل، لا يمكن التراجع بعد التنفيذ.</p>
+             <h3 className="text-2xl font-black text-gray-900 dark:text-white mb-2 text-center relative z-10">فاتورة السداد</h3>
+             <p className="text-[11px] font-bold text-gray-500 dark:text-gray-400 mb-6 text-center relative z-10">يرجى مراجعة التفاصيل، لا يمكن التراجع بعد التنفيذ.</p>
 
-             <div className="bg-black/50 p-5 rounded-[2rem] border border-white/5 space-y-4 mb-8 relative z-10">
-                <div className="flex justify-between items-center border-b border-white/5 pb-3">
+             <div className="bg-gray-50 dark:bg-black/50 p-5 rounded-[2rem] border border-gray-100 dark:border-white/5 space-y-4 mb-8 relative z-10">
+                <div className="flex justify-between items-center border-b border-gray-200 dark:border-white/5 pb-3">
                    <span className="text-[10px] text-gray-500 font-black uppercase">الخدمة المطلوبة</span>
-                   <span className="text-xs text-white font-black">{confirmData.pkg.name}</span>
+                   <span className="text-xs text-gray-900 dark:text-white font-black">{confirmData.pkg.name}</span>
                 </div>
-                <div className="flex justify-between items-center border-b border-white/5 pb-3">
+                <div className="flex justify-between items-center border-b border-gray-200 dark:border-white/5 pb-3">
                    <span className="text-[10px] text-gray-500 font-black uppercase">رقم الهاتف</span>
                    <span className="text-sm font-black tracking-widest" style={{ color: activeNet.color }} dir="ltr">{phone}</span>
                 </div>
-                <div className="flex justify-between items-center border-b border-white/5 pb-3">
+                <div className="flex justify-between items-center border-b border-gray-200 dark:border-white/5 pb-3">
                    <span className="text-[10px] text-gray-500 font-black uppercase">السعر الأساسي</span>
-                   <span className="text-xs text-white font-black">{Number(confirmData.pkg.price).toLocaleString()} <small className="text-[9px] opacity-70">ر.ي</small></span>
+                   <span className="text-xs text-gray-900 dark:text-white font-black">{Number(confirmData.pkg.price).toLocaleString()} <small className="text-[9px] text-gray-500 dark:opacity-70">ر.ي</small></span>
                 </div>
                 {network === 'Yemen Mobile' && northGate && (
-                  <div className="flex justify-between items-center border-b border-white/5 pb-3">
+                  <div className="flex justify-between items-center border-b border-gray-200 dark:border-white/5 pb-3">
                      <span className="text-[10px] text-red-500 font-black uppercase">رسوم التحويل ({northGateRatio}%)</span>
                      <span className="text-xs text-red-500 font-black">
                         +{ (confirmData.price - Number(confirmData.pkg.price)).toLocaleString() } <small className="text-[9px] opacity-70">ر.ي</small>
@@ -185,27 +176,26 @@ export default function TelecomTab({ onBack }) {
                   </div>
                 )}
                 <div className="flex justify-between items-center pt-1">
-                   <span className="text-[11px] text-gray-400 font-black uppercase">الإجمالي المخصوم</span>
-                   <span className="text-2xl text-white font-black">{(confirmData.price).toLocaleString()} <small className="text-[10px] opacity-50">ر.ي</small></span>
+                   <span className="text-[11px] text-gray-500 dark:text-gray-400 font-black uppercase">الإجمالي المخصوم</span>
+                   <span className="text-2xl text-gray-900 dark:text-white font-black">{(confirmData.price).toLocaleString()} <small className="text-[10px] text-gray-500 dark:opacity-50">ر.ي</small></span>
                 </div>
              </div>
 
              <div className="flex gap-3 relative z-10">
-                {/* 🟢 زر الدفع مع تأثير التحميل والحماية */}
-                <button 
-                  onClick={executeTelecomOrder} 
+                <button
+                  onClick={executeTelecomOrder}
                   disabled={isProcessing}
-                  className="flex-1 py-4 rounded-[2rem] text-black font-black text-sm transition-all shadow-lg flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed" 
+                  className="flex-1 py-4 rounded-[2rem] text-white font-black text-sm transition-all shadow-lg flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   style={{ backgroundColor: activeNet.color }}
                 >
-                  {isProcessing ? <><Loader2 size={18} className="animate-spin" /> جاري التنفيذ...</> : 'تأكيد واخصم'}
+                   {isProcessing ? <><Loader2 size={18} className="animate-spin" /> جاري التنفيذ...</> : 'تأكيد واخصم'}
                 </button>
-                <button 
-                  onClick={() => setConfirmData(null)} 
+                <button
+                  onClick={() => setConfirmData(null)}
                   disabled={isProcessing}
-                  className="flex-1 py-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-[2rem] text-white font-black text-sm transition-all disabled:opacity-50"
+                  className="flex-1 py-4 bg-gray-100 hover:bg-gray-200 dark:bg-white/5 dark:hover:bg-white/10 border border-gray-200 dark:border-white/10 rounded-[2rem] text-gray-700 dark:text-white font-black text-sm transition-all disabled:opacity-50"
                 >
-                  تعديل
+                   تعديل
                 </button>
              </div>
           </div>
@@ -213,13 +203,13 @@ export default function TelecomTab({ onBack }) {
       )}
 
       {customAlert && (
-        <div className="fixed inset-0 z-[120] bg-black/80 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in duration-300">
-          <div className="bg-[#121217] border border-white/10 p-8 rounded-[3rem] text-center shadow-2xl w-full max-w-sm animate-in zoom-in-95 duration-300">
-             <div className={`w-20 h-20 rounded-[2rem] mx-auto flex items-center justify-center mb-6 shadow-xl ${customAlert.type === 'success' ? 'bg-green-500/10 text-green-500 border border-green-500/20' : 'bg-red-500/10 text-red-500 border border-red-500/20'}`}>
+        <div className="fixed inset-0 z-[120] bg-black/60 dark:bg-black/80 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in duration-300">
+          <div className="bg-white dark:bg-[#121217] border border-gray-200 dark:border-white/10 p-8 rounded-[3rem] text-center shadow-2xl w-full max-w-sm animate-in zoom-in-95 duration-300 transition-colors">
+             <div className={`w-20 h-20 rounded-[2rem] mx-auto flex items-center justify-center mb-6 shadow-xl ${customAlert.type === 'success' ? 'bg-green-100 text-green-600 dark:bg-green-500/10 dark:text-green-500 border border-green-200 dark:border-green-500/20' : 'bg-red-100 text-red-600 dark:bg-red-500/10 dark:text-red-500 border border-red-200 dark:border-red-500/20'}`}>
                 {customAlert.type === 'success' ? <CheckCircle2 size={40} /> : <XCircle size={40} />}
              </div>
-             <h3 className="text-xl font-black text-white mb-2">{customAlert.title}</h3>
-             <p className="text-sm font-bold text-gray-400 mb-8 whitespace-pre-line leading-relaxed">{customAlert.msg}</p>
+             <h3 className="text-xl font-black text-gray-900 dark:text-white mb-2">{customAlert.title}</h3>
+             <p className="text-sm font-bold text-gray-500 dark:text-gray-400 mb-8 whitespace-pre-line leading-relaxed">{customAlert.msg}</p>
              <button onClick={closeAlert} className={`w-full py-4 rounded-[2rem] text-white font-black text-lg active:scale-95 transition-all ${customAlert.type === 'success' ? 'bg-green-600' : 'bg-red-600'}`}>
                 {customAlert.type === 'success' ? 'حسناً، عودة للرئيسية' : 'رجوع'}
              </button>
@@ -227,33 +217,31 @@ export default function TelecomTab({ onBack }) {
         </div>
       )}
 
-      <div className="sticky top-0 z-30 px-6 py-6 flex justify-between items-center bg-black/20 backdrop-blur-3xl border-b border-white/5">
+      <div className="sticky top-0 z-30 px-6 py-6 flex justify-between items-center bg-white/50 dark:bg-black/20 backdrop-blur-3xl border-b border-gray-200 dark:border-white/5 transition-colors">
          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-[1.2rem] flex items-center justify-center font-black text-white shadow-2xl transition-colors duration-500" style={{ backgroundColor: activeNet.color }}>
+            <div className="w-12 h-12 rounded-[1.2rem] flex items-center justify-center font-black text-white shadow-lg transition-colors duration-500" style={{ backgroundColor: activeNet.color }}>
                {activeNet.logo}
             </div>
             <div>
-               <h2 className="font-black text-white text-lg tracking-tight shadow-black drop-shadow-md">كابينة السداد</h2>
+               <h2 className="font-black text-gray-900 dark:text-white text-lg tracking-tight drop-shadow-sm dark:drop-shadow-md">كابينة السداد</h2>
                <p className="text-[10px] font-black uppercase tracking-widest transition-colors duration-500" style={{ color: activeNet.color }}>شبكة {activeNet.label}</p>
             </div>
          </div>
-         <button onClick={onBack} className="p-3 bg-white/5 rounded-2xl text-white hover:bg-white/10 active:scale-95 transition-all backdrop-blur-md"><X size={24}/></button>
+         <button onClick={onBack} className="p-3 bg-gray-100 dark:bg-white/5 rounded-2xl text-gray-700 dark:text-white hover:bg-gray-200 dark:hover:bg-white/10 active:scale-95 transition-all backdrop-blur-md"><X size={24}/></button>
       </div>
 
       <div className="p-5 space-y-8 mt-4 relative z-10">
-
         <div className="relative group">
-           <div className="absolute inset-0 blur-3xl opacity-20 transition-colors duration-700 rounded-[3rem]" style={{ backgroundColor: activeNet.color }}></div>
+           <div className="absolute inset-0 blur-3xl opacity-10 dark:opacity-20 transition-colors duration-700 rounded-[3rem]" style={{ backgroundColor: activeNet.color }}></div>
 
-           <div className="relative bg-[#0a0a0c]/80 backdrop-blur-xl p-8 rounded-[3rem] border-2 transition-colors duration-500 shadow-2xl" style={{ borderColor: phone.length > 0 ? `${activeNet.color}66` : '#ffffff10' }}>
+           <div className="relative bg-white/90 dark:bg-[#0a0a0c]/80 backdrop-blur-xl p-8 rounded-[3rem] border-2 transition-colors duration-500 shadow-xl" style={{ borderColor: phone.length > 0 ? `${activeNet.color}66` : 'rgba(156, 163, 175, 0.2)' }}>
               <div className="flex justify-between items-center mb-6">
-                <label className="block text-[10px] font-black text-gray-400 uppercase tracking-[0.4em]">رقم الهاتف</label>
-                
-                {/* 🟢 زر فتح جهات الاتصال الذكي */}
+                <label className="block text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-[0.4em]">رقم الهاتف</label>
+
                 {('contacts' in navigator && 'ContactsManager' in window) && (
-                  <button 
+                  <button
                     onClick={handlePickContact}
-                    className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-full transition-all active:scale-95"
+                    className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest px-3 py-1.5 bg-gray-100 hover:bg-gray-200 dark:bg-white/5 dark:hover:bg-white/10 border border-gray-200 dark:border-white/10 rounded-full transition-all active:scale-95"
                     style={{ color: activeNet.color }}
                   >
                     <Contact size={14} /> جهات الاتصال
@@ -270,49 +258,49 @@ export default function TelecomTab({ onBack }) {
                    setPhone(val);
                  }}
                  placeholder="7XXXXXXXX"
-                 className="w-full bg-transparent text-white text-5xl font-black text-center outline-none tracking-[0.2em] placeholder:text-gray-800 transition-colors duration-300 drop-shadow-lg"
-                 style={{ color: phone.length > 0 ? activeNet.color : 'white' }}
+                 className="w-full bg-transparent text-gray-900 dark:text-white text-3xl md:text-4xl font-black text-center outline-none tracking-widest placeholder:text-gray-300 dark:placeholder:text-gray-800/50 transition-colors duration-300 drop-shadow-sm"
+                 style={{ color: phone.length > 0 ? activeNet.color : undefined }}
                  dir="ltr"
               />
 
               {phone.length === 0 && recentPhones.length > 0 && (
-                <div className="mt-8 flex flex-wrap justify-center gap-2 animate-in fade-in duration-500">
-                  <div className="w-full text-center flex items-center justify-center gap-1 mb-2 text-gray-500">
+                 <div className="mt-8 flex flex-wrap justify-center gap-2 animate-in fade-in duration-500">
+                  <div className="w-full text-center flex items-center justify-center gap-1 mb-2 text-gray-400 dark:text-gray-500">
                      <History size={12} /> <span className="text-[9px] font-black uppercase tracking-widest">أرقام سابقة</span>
                   </div>
                   {recentPhones.map((num, i) => (
-                    <button key={i} onClick={() => setPhone(num)} className="px-4 py-2 bg-white/5 hover:bg-white/10 rounded-full border border-white/5 text-xs font-black text-white transition-all active:scale-95">
-                      {num}
+                    <button key={i} onClick={() => setPhone(num)} className="px-4 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-white/5 dark:hover:bg-white/10 rounded-full border border-gray-200 dark:border-white/5 text-xs font-black text-gray-700 dark:text-white transition-all active:scale-95">
+                       {num}
                     </button>
                   ))}
-                </div>
+                 </div>
               )}
 
               {network === 'Yemen Mobile' && (
-                <div className="mt-8 pt-6 border-t border-white/5 flex justify-between items-center px-2 animate-in fade-in slide-in-from-bottom-2">
+                <div className="mt-8 pt-6 border-t border-gray-200 dark:border-white/5 flex justify-between items-center px-2 animate-in fade-in slide-in-from-bottom-2">
                    <div className="flex items-center gap-3">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${northGate ? 'bg-red-500/20 text-red-500' : 'bg-white/5 text-gray-500'}`}>
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${northGate ? 'bg-red-100 text-red-600 dark:bg-red-500/20 dark:text-red-500' : 'bg-gray-100 text-gray-500 dark:bg-white/5 dark:text-gray-500'}`}>
                          <Percent size={14} />
                       </div>
                       <div className="flex flex-col">
-                         <span className="text-xs font-bold text-white">رقمي في المحافظات الشمالية</span>
+                         <span className="text-xs font-bold text-gray-800 dark:text-white">رقمي في المحافظات الشمالية</span>
                       </div>
                    </div>
-                   <button onClick={() => setNorthGate(!northGate)} className={`w-14 h-8 rounded-full p-1 flex items-center transition-colors duration-300 ${northGate ? 'bg-red-500' : 'bg-white/10 border border-white/5'}`}>
-                      <div className={`w-6 h-6 bg-white rounded-full shadow-lg transition-transform duration-300 ${northGate ? 'translate-x-0' : '-translate-x-6'}`}></div>
+                   <button onClick={() => setNorthGate(!northGate)} className={`w-14 h-8 rounded-full p-1 flex items-center transition-colors duration-300 ${northGate ? 'bg-red-500' : 'bg-gray-200 dark:bg-white/10 border border-gray-300 dark:border-white/5'}`}>
+                      <div className={`w-6 h-6 bg-white rounded-full shadow-md transition-transform duration-300 ${northGate ? 'translate-x-0' : '-translate-x-6'}`}></div>
                    </button>
                 </div>
               )}
            </div>
         </div>
 
-        <div className="flex bg-[#0a0a0c]/80 backdrop-blur-md p-2 rounded-[1.8rem] border border-white/5 shadow-inner">
-           <button onClick={() => setTab('packages')} className={`flex-1 py-4 rounded-2xl font-black text-[11px] transition-all duration-300 ${tab === 'packages' ? 'text-white shadow-lg' : 'text-gray-500'}`} style={{ backgroundColor: tab === 'packages' ? activeNet.color : 'transparent' }}>باقات ذكية</button>
-           <button onClick={() => setTab('instant')} className={`flex-1 py-4 rounded-2xl font-black text-[11px] transition-all duration-300 ${tab === 'instant' ? 'text-white shadow-lg' : 'text-gray-500'}`} style={{ backgroundColor: tab === 'instant' ? activeNet.color : 'transparent' }}>شحن فوري (رصيد)</button>
+        <div className="flex bg-white/80 dark:bg-[#0a0a0c]/80 backdrop-blur-md p-2 rounded-[1.8rem] border border-gray-200 dark:border-white/5 shadow-sm transition-colors">
+           <button onClick={() => setTab('packages')} className={`flex-1 py-4 rounded-2xl font-black text-[11px] transition-all duration-300 ${tab === 'packages' ? 'text-white shadow-md' : 'text-gray-500'}`} style={{ backgroundColor: tab === 'packages' ? activeNet.color : 'transparent' }}>باقات ذكية</button>
+           <button onClick={() => setTab('instant')} className={`flex-1 py-4 rounded-2xl font-black text-[11px] transition-all duration-300 ${tab === 'instant' ? 'text-white shadow-md' : 'text-gray-500'}`} style={{ backgroundColor: tab === 'instant' ? activeNet.color : 'transparent' }}>شحن فوري (رصيد)</button>
         </div>
 
         {tab === 'packages' && (
-          <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
+           <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
              {networkPackages.length > 0 && (
                <div className="flex gap-3 overflow-x-auto pb-2 custom-scrollbar">
                   {[
@@ -325,7 +313,7 @@ export default function TelecomTab({ onBack }) {
                       key={f.id}
                       onClick={() => setActiveFilter(f.id)}
                       className={`shrink-0 px-4 py-2.5 rounded-full text-[10px] font-black flex items-center gap-2 border transition-all active:scale-95 ${
-                        activeFilter === f.id ? 'bg-white text-black border-white shadow-lg' : 'bg-white/5 text-gray-500 border-white/5 backdrop-blur-sm'
+                        activeFilter === f.id ? 'bg-gray-900 text-white dark:bg-white dark:text-black border-transparent shadow-md' : 'bg-white dark:bg-white/5 text-gray-600 dark:text-gray-500 border-gray-200 dark:border-white/5 backdrop-blur-sm'
                       }`}
                     >
                       {f.icon} {f.label}
@@ -338,27 +326,27 @@ export default function TelecomTab({ onBack }) {
                 <button
                    key={p.id}
                    onClick={() => handlePreConfirm(p)}
-                   className="w-full bg-[#0d0d0f]/90 backdrop-blur-md p-6 rounded-[2.2rem] border border-white/5 flex flex-col gap-5 hover:bg-[#121217] active:scale-[0.97] transition-all relative overflow-hidden group shadow-xl text-right"
+                   className="w-full bg-white dark:bg-[#0d0d0f]/90 backdrop-blur-md p-6 rounded-[2.2rem] border border-gray-200 dark:border-white/5 flex flex-col gap-5 hover:bg-gray-50 dark:hover:bg-[#121217] active:scale-[0.97] transition-all relative overflow-hidden group shadow-sm dark:shadow-xl text-right"
                 >
                    <div className="absolute top-0 right-0 w-1.5 h-full opacity-60 transition-colors duration-500" style={{ backgroundColor: activeNet.color }}></div>
                    <div className="flex justify-between items-start w-full">
                       <div className="flex-1">
-                         <h4 className="font-black text-white text-base mb-1">{p.name}</h4>
-                         <p className="text-[10px] font-bold text-gray-400 truncate">مخصصة لشبكة {activeNet.label}</p>
+                         <h4 className="font-black text-gray-900 dark:text-white text-base mb-1">{p.name}</h4>
+                         <p className="text-[10px] font-bold text-gray-500 dark:text-gray-400 truncate">مخصصة لشبكة {activeNet.label}</p>
                       </div>
-                      <div className="text-xl font-black flex flex-col items-end gap-1 transition-colors duration-500 drop-shadow-md shrink-0" style={{ color: activeNet.color }}>
+                      <div className="text-xl font-black flex flex-col items-end gap-1 transition-colors duration-500 drop-shadow-sm shrink-0" style={{ color: activeNet.color }}>
                          <div className="flex items-baseline gap-1">
-                            {getFinalPrice(p.price).toLocaleString()} <small className="text-[9px] opacity-50">ر.ي</small>
+                            {getFinalPrice(p.price).toLocaleString()} <small className="text-[9px] opacity-60">ر.ي</small>
                          </div>
-                         {network === 'Yemen Mobile' && northGate && <span className="text-[8px] bg-red-500/20 text-red-500 px-2 py-0.5 rounded-full border border-red-500/30">شامل بوابة الشمال</span>}
+                         {network === 'Yemen Mobile' && northGate && <span className="text-[8px] bg-red-100 text-red-600 dark:bg-red-500/20 dark:text-red-500 px-2 py-0.5 rounded-full border border-red-200 dark:border-red-500/30">شامل بوابة الشمال</span>}
                       </div>
                    </div>
-                   <div className="flex justify-between items-center w-full bg-black/50 p-4 rounded-2xl border border-white/5">
-                      <div className="flex flex-col items-center gap-1"><Wifi size={14} className="text-gray-500" /><span className="text-[10px] text-white font-black">{p.mb || '-'}</span></div>
-                      <div className="w-[1px] h-4 bg-white/10"></div>
-                      <div className="flex flex-col items-center gap-1"><Mic size={14} className="text-gray-500" /><span className="text-[10px] text-white font-black">{p.min || '-'}</span></div>
-                      <div className="w-[1px] h-4 bg-white/10"></div>
-                      <div className="flex flex-col items-center gap-1"><Calendar size={14} className="text-gray-500" /><span className="text-[10px] text-white font-black">{p.days || '-'} يوم</span></div>
+                   <div className="flex justify-between items-center w-full bg-gray-50 dark:bg-black/50 p-4 rounded-2xl border border-gray-100 dark:border-white/5">
+                      <div className="flex flex-col items-center gap-1"><Wifi size={14} className="text-gray-400 dark:text-gray-500" /><span className="text-[10px] text-gray-700 dark:text-white font-black">{p.mb || '-'}</span></div>
+                      <div className="w-[1px] h-4 bg-gray-200 dark:bg-white/10"></div>
+                      <div className="flex flex-col items-center gap-1"><Mic size={14} className="text-gray-400 dark:text-gray-500" /><span className="text-[10px] text-gray-700 dark:text-white font-black">{p.min || '-'}</span></div>
+                      <div className="w-[1px] h-4 bg-gray-200 dark:bg-white/10"></div>
+                      <div className="flex flex-col items-center gap-1"><Calendar size={14} className="text-gray-400 dark:text-gray-500" /><span className="text-[10px] text-gray-700 dark:text-white font-black">{p.days || '-'} يوم</span></div>
                    </div>
                 </button>
              ))}
@@ -366,40 +354,39 @@ export default function TelecomTab({ onBack }) {
              {networkPackages.length === 0 && (
                 <div className="py-16 text-center space-y-4 opacity-40">
                    <Zap size={40} className="mx-auto text-gray-500" />
-                   <p className="text-xs font-black uppercase tracking-widest text-white">لا توجد باقات متاحة حالياً</p>
+                   <p className="text-xs font-black uppercase tracking-widest text-gray-700 dark:text-white">لا توجد باقات متاحة حالياً</p>
                 </div>
              )}
           </div>
         )}
 
         {tab === 'instant' && (
-          <div className="grid grid-cols-2 gap-4 animate-in fade-in slide-in-from-left-4 duration-300">
+           <div className="grid grid-cols-2 gap-4 animate-in fade-in slide-in-from-left-4 duration-300">
              {networkInstant.length > 0 ? (
                 networkInstant.map(p => (
                    <button
                       key={p.id}
                       onClick={() => handlePreConfirm(p)}
-                      className="bg-[#0d0d0f]/90 backdrop-blur-md p-5 rounded-[2rem] border border-white/5 flex flex-col items-center justify-center gap-3 active:scale-[0.95] transition-all group shadow-xl"
+                      className="bg-white dark:bg-[#0d0d0f]/90 backdrop-blur-md p-5 rounded-[2rem] border border-gray-200 dark:border-white/5 flex flex-col items-center justify-center gap-3 active:scale-[0.95] transition-all group shadow-sm dark:shadow-xl"
                    >
-                      <div className="w-12 h-12 rounded-full flex items-center justify-center bg-white/5 group-hover:scale-110 transition-transform" style={{ color: activeNet.color }}>
+                      <div className="w-12 h-12 rounded-full flex items-center justify-center bg-gray-100 dark:bg-white/5 group-hover:scale-110 transition-transform" style={{ color: activeNet.color }}>
                          <Zap size={24} />
                       </div>
-                      <h4 className="font-black text-white text-sm">{p.name}</h4>
-                      <div className="px-3 py-1.5 rounded-xl border border-white/5 bg-black/40 font-black text-base" style={{ color: activeNet.color }}>
+                      <h4 className="font-black text-gray-900 dark:text-white text-sm">{p.name}</h4>
+                      <div className="px-3 py-1.5 rounded-xl border border-gray-100 dark:border-white/5 bg-gray-50 dark:bg-black/40 font-black text-base" style={{ color: activeNet.color }}>
                          {getFinalPrice(p.price).toLocaleString()} <small className="text-[8px] opacity-60">ر.ي</small>
                       </div>
-                      {network === 'Yemen Mobile' && northGate && <span className="text-[8px] text-red-500 font-bold bg-red-500/10 px-2 rounded-full">شامل الضريبة</span>}
+                      {network === 'Yemen Mobile' && northGate && <span className="text-[8px] text-red-600 dark:text-red-500 font-bold bg-red-100 dark:bg-red-500/10 px-2 rounded-full">شامل الضريبة</span>}
                    </button>
                 ))
              ) : (
                 <div className="col-span-2 py-16 text-center space-y-4 opacity-40">
                    <Smartphone size={40} className="mx-auto text-gray-500" />
-                   <p className="text-xs font-black uppercase tracking-widest text-white">لا توجد تعبئة فورية متاحة</p>
+                   <p className="text-xs font-black uppercase tracking-widest text-gray-700 dark:text-white">لا توجد تعبئة فورية متاحة</p>
                 </div>
              )}
           </div>
         )}
-
       </div>
     </div>
   );

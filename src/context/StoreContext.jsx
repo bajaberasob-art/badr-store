@@ -69,7 +69,7 @@ export const StoreProvider = ({ children }) => {
   // ==========================================
   // 5. محرك النظام (المزامنة المحلية + السحابية ☁️)
   // ==========================================
-  
+
   // تفعيل الوضع الليلي
   useEffect(() => {
     const root = document.documentElement;
@@ -82,10 +82,10 @@ export const StoreProvider = ({ children }) => {
 
   // الحفظ المحلي السريع (Local Storage)
   useEffect(() => {
-    const localDb = { 
-      badr_settings: settings, badr_currentUser: currentUser, badr_users: users, 
-      badr_orders: orders, badr_notifications: notifications, badr_ads: ads, 
-      badr_services: services, badr_telecom: telecomData, badr_logs: logs 
+    const localDb = {
+      badr_settings: settings, badr_currentUser: currentUser, badr_users: users,
+      badr_orders: orders, badr_notifications: notifications, badr_ads: ads,
+      badr_services: services, badr_telecom: telecomData, badr_logs: logs
     };
     Object.entries(localDb).forEach(([key, val]) => localStorage.setItem(key, JSON.stringify(val)));
   }, [settings, currentUser, users, orders, notifications, ads, services, telecomData, logs]);
@@ -93,11 +93,11 @@ export const StoreProvider = ({ children }) => {
   // الاستماع المستمر للسحابة (Firebase Realtime Listeners)
   useEffect(() => {
     if (!db) return; // حماية في حال تأخر تحميل فايربيس
-    
+
     const unsubSettings = onSnapshot(doc(db, "store", "settings"), (d) => { if (d.exists()) setSettings(prev => ({...prev, ...d.data()})); });
     const unsubTelecom = onSnapshot(doc(db, "store", "telecom"), (d) => { if (d.exists()) setTelecomData(d.data()); });
 
-    const unsubUsers = onSnapshot(collection(db, "users"), (s) => { 
+    const unsubUsers = onSnapshot(collection(db, "users"), (s) => {
       if(!s.empty) {
         const fetchedUsers = s.docs.map(d => d.data());
         setUsers(fetchedUsers);
@@ -108,10 +108,14 @@ export const StoreProvider = ({ children }) => {
             setCurrentUser(updatedMe);
           }
         }
-      } 
+      }
+    });
+
+    // 🟢 قفل تكرار الطلبات: نأخذها مباشرة من السحابة عشان ما تظهر مرتين
+    const unsubOrders = onSnapshot(query(collection(db, "orders"), orderBy("_ts", "desc")), (s) => { 
+      setOrders(s.docs.map(d => d.data())); 
     });
     
-    const unsubOrders = onSnapshot(query(collection(db, "orders"), orderBy("_ts", "desc")), (s) => { if(!s.empty) setOrders(s.docs.map(d => d.data())); });
     const unsubServices = onSnapshot(query(collection(db, "services"), orderBy("_order", "asc")), (s) => { if(!s.empty) setServices(s.docs.map(d => d.data())); });
     const unsubAds = onSnapshot(query(collection(db, "ads"), orderBy("_ts", "desc")), (s) => { if(!s.empty) setAds(s.docs.map(d => d.data())); });
     const unsubNotif = onSnapshot(query(collection(db, "notifications"), orderBy("_ts", "desc")), (s) => { if(!s.empty) setNotifications(s.docs.map(d => d.data())); });
@@ -133,7 +137,7 @@ export const StoreProvider = ({ children }) => {
       setCurrentUser(customAdmin);
       return { success: true, role: 'admin' };
     }
-    
+
     const u = users.find(x => x.phone === phoneOrUser && x.password === password);
     if (u) {
       if (u.status === 'suspended') return { success: false, msg: 'عذراً، حسابك موقوف مؤقتاً.' };
@@ -165,45 +169,62 @@ export const StoreProvider = ({ children }) => {
 
     const newOrder = {
       id: Math.random().toString(36).substr(2, 9),
-      userId: String(currentUser.id), 
-      userName: currentUser.name, 
-      serviceName, 
-      details, 
-      price: finalPrice, 
+      userId: String(currentUser.id),
+      userName: currentUser.name,
+      serviceName,
+      details,
+      price: finalPrice,
       status: 'pending',
       date: new Date().toLocaleString('ar-YE', { hour12: true }),
       _ts: Date.now() // ☁️ للترتيب السحابي
     };
 
-    // تحديث محلي سريع
-    setOrders(prev => [newOrder, ...prev]);
+    // 🟢 خصم الرصيد
     updateUserBalance(currentUser.id, -finalPrice);
 
-    // تحديث سحابي
+    // 🟢 تحديث سحابي فقط (منعنا الإضافة اليدوية عشان الفايربيس هو اللي يجيب الطلب وما يتكرر)
     await setDoc(doc(db, "orders", String(newOrder.id)), newOrder);
     return { success: true };
   };
 
-  const updateOrderStatus = (orderId, newStatus) => {
+  // 🟢 الدرع المصفح لمعالجة الطلبات
+  const updateOrderStatus = async (orderId, newStatus, reason = '') => {
+    // 1. جلب الطلب من القائمة الحالية
     const targetOrder = orders.find(o => String(o.id) === String(orderId));
-    if (!targetOrder) return;
+    
+    // حماية: لو الطلب غير موجود أو الحالة هي نفسها، اخرج فوراً
+    if (!targetOrder || targetOrder.status === newStatus) return;
 
-    if (newStatus === 'accepted' && (targetOrder.serviceName.includes('سداد') || targetOrder.serviceName.includes('رصيد'))) {
-      const user = users.find(u => String(u.id) === String(targetOrder.userId));
-      if (user && user.isDistributor) {
-         const cashback = Math.round(targetOrder.price * 0.01); // 1% عمولة
-         updateUserBalance(user.id, cashback);
-         addNotification(user.id, 'عمولة موزع VIP 🎁', `تم إضافة عمولة ${cashback} ر.ي لعملية سداد.`);
+    // 🔴 حالة الرفض: الاسترجاع يتم هنا لضمان عدم التكرار (فقط لو كان الطلب pending)
+    if (newStatus === 'rejected' && targetOrder.status === 'pending') {
+      updateUserBalance(targetOrder.userId, targetOrder.price);
+      
+      // دمج الإشعار (مبلغ + سبب) في إشعار واحد لتنظيف مركز التنبيهات
+      const msg = reason ? `سبب الرفض: ${reason}` : `تم رفض طلبك وإرجاع مبلغ ${targetOrder.price.toLocaleString()} ر.ي لمحفظتك.`;
+      addNotification(targetOrder.userId, `إرجاع رصيد ${targetOrder.price.toLocaleString()} ر.ي 🔄`, msg);
+    }
+
+    // 🟢 حالة القبول: عمولة الموزع
+    if (newStatus === 'accepted' && targetOrder.status === 'pending') {
+      if (targetOrder.serviceName.includes('سداد') || targetOrder.serviceName.includes('رصيد')) {
+        const user = users.find(u => String(u.id) === String(targetOrder.userId));
+        if (user?.isDistributor) {
+          const cashback = Math.round(targetOrder.price * 0.01);
+          updateUserBalance(user.id, cashback);
+          addNotification(user.id, 'عمولة موزع VIP 🎁', `تم إضافة عمولة ${cashback} ر.ي لعملية سداد.`);
+        }
       }
     }
 
-    if (newStatus === 'rejected') {
-      updateUserBalance(targetOrder.userId, targetOrder.price);
-      addNotification(targetOrder.userId, 'إشعار إرجاع رصيد 🔄', `تم رفض طلبك وإرجاع مبلغ ${targetOrder.price} ر.ي لمحفظتك.`);
+    // 2. تحديث السحابة (Firebase)
+    try {
+      await setDoc(doc(db, "orders", String(orderId)), { ...targetOrder, status: newStatus }, { merge: true });
+    } catch (e) {
+      console.error("خطأ في تحديث السحابة:", e);
     }
 
+    // 3. تحديث الحالة محلياً فقط (لتغيير اللون والتفاعل السريع في الواجهة)
     setOrders(prev => prev.map(o => String(o.id) === String(orderId) ? { ...o, status: newStatus } : o));
-    setDoc(doc(db, "orders", String(orderId)), { ...targetOrder, status: newStatus }, { merge: true }); // ☁️ سحابة
   };
 
   const updateUserBalance = (userId, amount) => {
@@ -243,13 +264,13 @@ export const StoreProvider = ({ children }) => {
     const original = services.find(s => s.id === serviceId);
     if (original) {
       const id = Date.now();
-      const newService = { 
-        ...original, 
-        id: id.toString(), 
-        name: `${original.name} (نسخة)`, 
-        isPopular: false, 
-        packages: original.packages.map(p => ({ ...p, id: Date.now() + Math.random() })), 
-        _order: Date.now() 
+      const newService = {
+        ...original,
+        id: id.toString(),
+        name: `${original.name} (نسخة)`,
+        isPopular: false,
+        packages: original.packages.map(p => ({ ...p, id: Date.now() + Math.random() })),
+        _order: Date.now()
       };
       setServices(prev => [...prev, newService]);
       setDoc(doc(db, "services", String(id)), newService);
@@ -263,7 +284,7 @@ export const StoreProvider = ({ children }) => {
     const targetIndex = direction === 'up' ? index - 1 : index + 1;
     [newServices[index], newServices[targetIndex]] = [newServices[targetIndex], newServices[index]];
     setServices(newServices);
-    
+
     // حفظ الترتيب الجديد في السحابة
     const batch = writeBatch(db);
     newServices.forEach((s, idx) => {
@@ -369,12 +390,12 @@ export const StoreProvider = ({ children }) => {
       
       if (d.settings) { setSettings(d.settings); batch.set(doc(db, "store", "settings"), d.settings); }
       if (d.telecomData) { setTelecomData(d.telecomData); batch.set(doc(db, "store", "telecom"), d.telecomData); }
-      
+
       if (d.users) { setUsers(d.users); d.users.forEach(u => batch.set(doc(db, "users", String(u.id)), u)); }
       if (d.services) { setServices(d.services); d.services.forEach(s => batch.set(doc(db, "services", String(s.id)), s)); }
       if (d.orders) { setOrders(d.orders); d.orders.forEach(o => batch.set(doc(db, "orders", String(o.id)), o)); }
       if (d.ads) { setAds(d.ads); d.ads.forEach(a => batch.set(doc(db, "ads", String(a.id)), a)); }
-      
+
       await batch.commit(); // تنفيذ الرفع
       return { success: true, msg: 'تم استيراد قاعدة البيانات للسحابة بنجاح ☁️✅' };
     } catch (e) { return { success: false, msg: 'خطأ: الملف المرفوع غير صالح أو الاتصال ضعيف' }; }

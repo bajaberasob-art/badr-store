@@ -7,7 +7,16 @@ import {
 } from 'lucide-react';
 
 export default function ServicesTab() {
-  const { services = [], setServices, updateSettings, settings, addService, deleteService } = useStore();
+  // 🟢 استدعاء دوال السحابة المباشرة من المخ (بدون ترقيعات محلية)
+  const { 
+    services = [], 
+    addService, 
+    updateService, 
+    deleteService, 
+    cloneService, 
+    reorderService, 
+    settings 
+  } = useStore();
 
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -24,25 +33,6 @@ export default function ServicesTab() {
 
   const [tempPkg, setTempPkg] = useState({ name: '', price: '' });
   const sarRate = Number(settings?.exchangeRate) || 140;
-
-  // ☢️ الضربة القاضية المطورة (تزامن سحابي ومحلي فوري)
-  const forceSaveAll = (newServicesArray) => {
-    if (setServices) setServices(newServicesArray);
-    
-    // التحديث عبر دالة المتجر لضمان الرفع للسحابة (Firebase)
-    if (updateSettings) {
-      updateSettings({ ...settings, services: newServicesArray });
-    }
-
-    // نسخ احتياطي قوي في المتصفح
-    try {
-      const currentStorage = JSON.parse(localStorage.getItem('badr_settings') || '{}');
-      currentStorage.services = newServicesArray;
-      localStorage.setItem('badr_settings', JSON.stringify(currentStorage));
-    } catch (err) {
-      console.error('Local Storage Error:', err);
-    }
-  };
 
   const categories = [
     { id: 'all', label: 'الكل', icon: <LayoutGrid size={18}/> },
@@ -91,11 +81,10 @@ export default function ServicesTab() {
             height = MAX_HEIGHT;
           }
         }
-        
+
         canvas.width = width;
         canvas.height = height;
         ctx.drawImage(img, 0, 0, width, height);
-        
         // التحويل إلى WebP لتقليل المساحة بشكل كبير
         const compressedBase64 = canvas.toDataURL('image/webp', 0.8);
         setFormData(prev => ({ ...prev, image: compressedBase64 }));
@@ -135,20 +124,27 @@ export default function ServicesTab() {
     });
   };
 
-  const handleSave = (e) => {
+  // ☢️ دالة الحفظ الصاروخية للسحابة (بدون أخطاء)
+  const handleSave = async (e) => {
     e.preventDefault();
     if (!formData.image || !formData.name) return alert('أكمل البيانات وأضف صورة يا بطل!');
     if (formData.packages.length === 0) return alert('يجب إضافة باقة واحدة على الأقل!');
 
-    if (editingId) {
-      const updatedServices = services.map(s => s.id === editingId ? { ...formData, id: editingId } : s);
-      forceSaveAll(updatedServices);
-    } else {
-      // استخدم الضربة القاضية هنا أيضاً للضمان 100%
-      const newService = { ...formData, id: Date.now().toString() };
-      forceSaveAll([...services, newService]);
+    try {
+      // 🧹 تنظيف البيانات من أي undefined عشان فايربيس يقبلها
+      const cleanData = JSON.parse(JSON.stringify(formData));
+
+      if (editingId) {
+        const updatedService = { ...cleanData, id: editingId };
+        if (updateService) updateService(updatedService);
+      } else {
+        if (addService) addService(cleanData);
+      }
+      resetForm();
+    } catch (error) {
+      console.error("خطأ أثناء الحفظ:", error);
+      alert("حدث خطأ أثناء حفظ الخدمة: " + error.message);
     }
-    resetForm();
   };
 
   const resetForm = () => {
@@ -169,42 +165,23 @@ export default function ServicesTab() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  // 🟢 دوال الإجراءات السريعة (تحدث السحابة مباشرة)
   const toggleQuickAction = (serviceId, field) => {
-    const updatedServices = services.map(s => {
-      if (s.id === serviceId) {
-        const currentValue = s[field];
-        const actualValue = currentValue === undefined ? (field === 'isVisible' ? true : false) : currentValue;
-        return { ...s, [field]: !actualValue };
-      }
-      return s;
-    });
-    forceSaveAll(updatedServices);
+    const targetService = services.find(s => s.id === serviceId);
+    if (!targetService) return;
+
+    const actualValue = targetService[field] === undefined ? (field === 'isVisible' ? true : false) : targetService[field];
+    const updatedService = { ...targetService, [field]: !actualValue };
+    
+    if (updateService) updateService(updatedService);
   };
 
   const handleClone = (serviceId) => {
-    const original = services.find(s => s.id === serviceId);
-    if (original) {
-      const clonedPackages = (original.packages || []).map(p => ({ ...p, id: Date.now() + Math.random() }));
-      const newService = {
-        ...original,
-        id: Date.now().toString(),
-        name: `${original.name} (نسخة)`,
-        isPopular: false,
-        packages: clonedPackages
-      };
-      forceSaveAll([newService, ...services]); // نضيفها في البداية عشان تبين
-    }
+    if (cloneService) cloneService(serviceId);
   };
 
   const handleReorder = (id, direction) => {
-    const index = services.findIndex(s => s.id === id);
-    if ((direction === 'up' && index === 0) || (direction === 'down' && index === services.length - 1)) return;
-
-    const newServices = [...services];
-    const targetIndex = direction === 'up' ? index - 1 : index + 1;
-    [newServices[index], newServices[targetIndex]] = [newServices[targetIndex], newServices[index]];
-
-    forceSaveAll(newServices);
+    if (reorderService) reorderService(id, direction);
   };
 
   return (
@@ -242,7 +219,7 @@ export default function ServicesTab() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
             {/* منطقة رفع الصورة (تدعم السحب والإفلات) */}
             <div className="lg:col-span-1">
-              <div 
+              <div
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
@@ -255,7 +232,7 @@ export default function ServicesTab() {
                   <div className="text-center text-gray-600 group-hover:text-orange-500 transition-colors pointer-events-none">
                     <Upload size={50} className={`mx-auto mb-3 transition-transform duration-300 ${isDragging ? 'scale-125 text-orange-500' : ''}`} />
                     <p className="text-xs font-black uppercase tracking-widest leading-relaxed">
-                       {isDragging ? 'أفلت الصورة هنا' : 'اضغط للرفع\nأو اسحب الصورة هنا'}
+                      {isDragging ? 'أفلت الصورة هنا' : 'اضغط للرفع\nأو اسحب الصورة هنا'}
                     </p>
                   </div>
                 )}
@@ -291,8 +268,8 @@ export default function ServicesTab() {
           {/* محرر الباقات الذكي */}
           <div className="bg-black/40 p-8 rounded-[3rem] border border-white/5 shadow-inner space-y-6">
             <div className="flex justify-between items-center">
-               <h4 className="text-lg font-black text-white flex items-center gap-3"><DollarSign size={22} className="text-green-500"/> محرر الباقات (ر.س ➡️ ر.ي)</h4>
-               <span className="text-[10px] font-black text-gray-500 bg-white/5 px-3 py-1 rounded-full border border-white/5">صرف اليوم: {sarRate}</span>
+              <h4 className="text-lg font-black text-white flex items-center gap-3"><DollarSign size={22} className="text-green-500"/> محرر الباقات (ر.س ➡️ ر.ي)</h4>
+              <span className="text-[10px] font-black text-gray-500 bg-white/5 px-3 py-1 rounded-full border border-white/5">صرف اليوم: {sarRate}</span>
             </div>
 
             {/* صف إضافة باقة جديدة */}
@@ -318,10 +295,9 @@ export default function ServicesTab() {
                    <div className="col-span-1"></div>
                 </div>
               )}
-
               <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
                 {formData.packages.length === 0 ? (
-                   <p className="text-center text-gray-600 text-xs font-black uppercase py-8">لم يتم إضافة أي باقات بعد</p>
+                  <p className="text-center text-gray-600 text-xs font-black uppercase py-8">لم يتم إضافة أي باقات بعد</p>
                 ) : (
                   formData.packages.map((pkg) => (
                     <div key={pkg.id} className="grid grid-cols-1 md:grid-cols-12 gap-4 bg-black/40 p-3 rounded-2xl border border-white/5 group hover:border-white/10 transition-all items-center">
@@ -356,7 +332,7 @@ export default function ServicesTab() {
 
           return (
           <div key={service.id} className={`bg-[#121217] p-6 rounded-[3rem] border transition-all shadow-xl relative group overflow-hidden flex flex-col ${isVisible ? 'border-white/5 hover:border-orange-500/30' : 'border-red-500/20 opacity-60 grayscale-[30%]'}`}>
-
+            
             <div className="absolute top-4 right-4 flex gap-2 z-20">
               <button
                 onClick={() => toggleQuickAction(service.id, 'isPopular')}
@@ -390,7 +366,7 @@ export default function ServicesTab() {
               <div className="flex-1 overflow-hidden">
                 <h4 className="font-black text-white text-xl line-clamp-2 leading-tight">{service.name}</h4>
                 <p className="text-[10px] text-gray-500 font-black uppercase tracking-widest mt-2 flex items-center gap-1">
-                   {categories.find(c=>c.id===service.category)?.icon} {categories.find(c=>c.id===service.category)?.label} • {(service.packages || []).length} باقة
+                  {categories.find(c=>c.id===service.category)?.icon} {categories.find(c=>c.id===service.category)?.label} • {(service.packages || []).length} باقة
                 </p>
               </div>
             </div>
